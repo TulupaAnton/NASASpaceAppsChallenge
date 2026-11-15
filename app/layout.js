@@ -1,7 +1,7 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Earth to Finland',
+  title: 'DataX',
   description: 'Fly to Finland and explore NASA climate data for data center siting.',
   icons: { icon: '/legacy/assets/terra-icon.svg' },
 };

@@ -14,6 +14,8 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
   const centerY = (north + south) / 2;
   let size, view, transition, zoomTarget, frame = 0, lastFrame, dirty = true, selected, hover, keyboard;
   let borders = 0, isolation = 0, active = false;
+  let resolvePainted;
+  const painted = new Promise(resolve => { resolvePainted = resolve; });
   let drag, pinch, gestureScale;
   let candidates = [], rings = [];
   const pointers = new Map();
@@ -85,11 +87,12 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     schedule();
   }
 
-  function enter(skip) {
+  function enter(skip, handoffDelay = 0) {
     if (active || !size) return;
     active = true;
     if (skip) view = fit();
-    animate(fit(), 1, 0, skip ? 460 : 1120);
+    animate(fit(), 1, 0, skip ? 460 : 1120 / 1.5);
+    if (!skip && transition) transition.start += handoffDelay;
   }
 
   function show(site) {
@@ -308,6 +311,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
       paintAreas();
       paintPoints(width, height);
       dirty = false;
+      if (resolvePainted) { resolvePainted(true); resolvePainted = undefined; }
     }
     if (transition || zoomTarget) schedule();
   }
@@ -527,10 +531,11 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     canvas.addEventListener(event, handler, event === 'wheel' || event.startsWith('gesture') ? { passive: false } : undefined);
   }
   return {
-    enter, show, zoom, setContext,
+    enter, show, zoom, setContext, whenPainted: () => painted,
     destroy() {
       observer.disconnect();
       cancelAnimationFrame(frame);
+      if (resolvePainted) { resolvePainted(false); resolvePainted = undefined; }
       for (const [event, handler] of Object.entries(handlers)) canvas.removeEventListener(event, handler);
     },
   };

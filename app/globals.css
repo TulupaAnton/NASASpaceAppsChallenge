@@ -26,6 +26,25 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 body { margin: 0; }
+.cloud-lab { position: relative; height: 100svh; overflow: hidden; background: #000; }
+.cloud-lab-scene { position: absolute; inset: 0; }
+.cloud-lab-scene canvas { display: block; width: 100%; height: 100%; }
+.approach-final-map { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.cloud-lab-controls { position: absolute; z-index: 2; bottom: 28px; left: 50%; transform: translateX(-50%); }
+.cloud-lab-controls button {
+  min-width: 160px;
+  min-height: 44px;
+  padding: 10px 20px;
+  border: 1px solid #ffffff45;
+  border-radius: 8px;
+  background: #121718d9;
+  color: #f2ecde;
+  font-size: 14px;
+  backdrop-filter: blur(12px);
+}
+.cloud-lab-controls button:hover:not(:disabled) { background: #22292b; }
+.cloud-lab-controls button:focus-visible { outline-color: #f2ecde; }
+.cloud-lab-controls button:disabled { opacity: .65; }
 h1, h2, h3, p, dl, dd { margin: 0; }
 button, select { font: inherit; color: inherit; }
 button, select { cursor: pointer; }
@@ -120,6 +139,9 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
 .map { touch-action: none; opacity: 0; pointer-events: none; }
 .map:focus-visible { outline-offset: -4px; z-index: 1; }
 .map[aria-hidden="false"] { opacity: 1; pointer-events: auto; }
+.experience[data-view="flight"] .map { pointer-events: none; }
+.cloud-transition { position: absolute; z-index: 2; inset: 0; pointer-events: none; }
+.cloud-transition canvas { display: block; width: 100%; height: 100%; }
 .experience[data-view="analysis"] .map { touch-action: pan-y pinch-zoom; }
 
 .flight {
@@ -127,11 +149,124 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
   background: #000;
   object-fit: contain;
   opacity: 1;
-  transition: opacity .57s ease;
+  transition: opacity .38s ease;
   pointer-events: none;
 }
 
-.flight-hidden { opacity: 0; visibility: hidden; transition: opacity .57s ease, visibility 0s .57s; }
+.flight-hidden { opacity: 0; visibility: hidden; transition: opacity .38s ease, visibility 0s .38s; }
+
+.country-landing {
+  --landing-gutter: clamp(40px, 5vw, 96px);
+  position: absolute;
+  z-index: 2;
+  inset: 0 auto 0 0;
+  width: 48%;
+  background: #f2ecde;
+  color: #11110f;
+  color-scheme: light;
+  border-right: 1px solid #bfb6a1;
+  transform: translateX(calc((var(--country-panel-progress, 0) - 1) * 100%));
+  will-change: transform;
+}
+.country-brand {
+  position: absolute;
+  top: 56px;
+  left: var(--landing-gutter);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -.055em;
+}
+.country-choice {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  width: calc(100% - 2 * var(--landing-gutter));
+  max-width: 540px;
+  text-align: center;
+}
+.country-choice h1 {
+  font-size: clamp(60px, 6vw, 112px);
+  font-weight: 600;
+  line-height: .98;
+  letter-spacing: -.065em;
+}
+.country-search { position: relative; width: min(100%, 500px); margin: 32px auto 0; }
+.country-search::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border: 1px solid #c7bdab;
+  border-radius: 8px;
+  pointer-events: none;
+}
+.country-search:focus-within::before { border-color: #514a3e; }
+.country-search[data-expanded="true"]::before { bottom: -36px; border-color: #514a3e; }
+.country-search input {
+  display: block;
+  width: 100%;
+  height: 60px;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 8px;
+  background: #e9e2d2;
+  color: #11110f;
+  font: inherit;
+  font-size: 22px;
+  transition: border-color .2s ease;
+}
+.country-search input::placeholder { color: #736d61; opacity: 1; }
+.country-search input:focus-visible { outline: none; background: #f6f0e5; }
+.country-search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-left: 12px;
+  cursor: pointer;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3 3 10 10M13 3 3 13' fill='none' stroke='%2311110f' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.country-search input:disabled { opacity: .6; }
+.country-search[data-expanded="true"] input { border-radius: 8px 8px 0 0; }
+.country-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  height: 36px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0 0 8px 8px;
+  background: #f6f0e5;
+}
+.country-results::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0 1px auto;
+  height: 1px;
+  background: #c7bdab;
+  pointer-events: none;
+}
+.country-option {
+  display: block;
+  text-align: left;
+  min-height: 36px;
+  width: 100%;
+  margin: 0;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 0;
+  background: #f6f0e5;
+  color: #11110f;
+  font-size: 14px;
+  transition: background .2s ease, border-color .2s ease;
+}
+.country-option:hover:not(:disabled) { background: #e3dac8; }
+.country-option:focus-visible { outline-color: #514a3e; outline-offset: -3px; }
+.country-empty { padding: 8px 18px; line-height: 20px; font-size: 13px; color: #736d61; }
 
 .map-heading {
   position: absolute;
@@ -513,3 +648,13 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
 .comparison-table td { color: var(--muted); }
 .comparison-table tbody th { font-weight: 500; }
 .comparison-canvas { position: relative; height: clamp(185px, 24vh, 256px); margin-top: 7px; }
+
+/* Approved city-lights opening, replacing the prerecorded flight. */
+.earth-opening { object-fit: initial; touch-action: none; background: transparent; }
+.earth-opening canvas { display: block; width: 100%; height: 100%; }
+.experience[data-view="flight"] .topbar,
+.experience[data-view="flight"] .footer > .credits { visibility: hidden; }
+.experience[data-view="flight"] .flight-controls { animation: opening-controls-in .267s .533s both; }
+@keyframes opening-controls-in { from { opacity: 0; visibility: hidden; } to { opacity: 1; visibility: visible; } }
+@media (max-width: 939px) { .earth-opening { width: 100%; left: 0; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .earth-opening, .experience[data-view="flight"] .flight-controls { transition: none; animation: none; } }

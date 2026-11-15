@@ -8,26 +8,36 @@ import { createMapView } from '../lib/map-view';
 import { selection, selectionKey, siteOptions, sites } from '../lib/sites';
 import { Icon } from './Icon';
 
+const EarthOpening = dynamic(() => import('./EarthOpening'), { ssr: false });
+
 const Analysis = dynamic(() => import('./Analysis'), {
   ssr: false,
   loading: () => <div className="analysis-loading" role="status">Loading analysis…</div>,
 });
 
 export default function Experience() {
-  const [phase, setPhase] = useState('flight');
+  const [phase, setPhase] = useState('reveal');
+  const [countryChosen, setCountryChosen] = useState(false);
+  const [countryQuery, setCountryQuery] = useState('');
+  const [countrySearchOpen, setCountrySearchOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [shortlist, setShortlist] = useState([]);
   const [mapRadius, setMapRadius] = useState(null);
-  const [paused, setPaused] = useState(false);
+  const [openingMounted, setOpeningMounted] = useState(true);
+  const [openingRun, setOpeningRun] = useState(0);
+  const [mapPrepared, setMapPrepared] = useState(false);
   const [notice, setNotice] = useState('');
-  const video = useRef(null);
   const canvas = useRef(null);
+  const experience = useRef(null);
   const focusArea = useRef(null);
   const view = useRef(null);
-  const phaseRef = useRef('flight');
+  const phaseRef = useRef('reveal');
+  const openingFailed = useRef(false);
   const run = useRef(0);
   const noteTimer = useRef(null);
   const motion = useRef(null);
+  const skipRequested = useRef(false);
+  const preparedMap = useRef(null);
 
   const choosePoint = useCallback(site => {
     setNotice('');
@@ -41,40 +51,61 @@ export default function Experience() {
     noteTimer.current = setTimeout(() => setNotice(''), 3600);
   }, []);
 
-  const enterMap = useCallback(async (skip = false) => {
+  const prepareMap = useCallback(() => {
+    if (preparedMap.current) return preparedMap.current;
+    const current = run.current;
+    preparedMap.current = (async () => {
+      try {
+        const assets = await loadMap();
+        if (current !== run.current || !canvas.current) return false;
+        view.current?.destroy();
+        view.current = createMapView(canvas.current, focusArea.current, assets, choosePoint, miss, () => motion.current?.matches);
+        view.current.enter(true);
+        const painted = await view.current.whenPainted();
+        return painted && current === run.current;
+      } catch (error) {
+        if (current === run.current) preparedMap.current = null;
+        throw error;
+      }
+    })();
+    return preparedMap.current;
+  }, [choosePoint, miss]);
+
+  const enterMap = useCallback(async (skip = false, cloudHandoff = false) => {
+    if (skip) skipRequested.current = true;
+    if (skip && phaseRef.current === 'cloud-exit') {
+      phaseRef.current = 'map'; setPhase('map'); setOpeningMounted(false);
+      return;
+    }
     if (phaseRef.current === 'map' || phaseRef.current === 'loading') return;
     phaseRef.current = 'loading';
     setPhase('loading');
-    video.current?.pause();
-    const current = ++run.current;
+    const current = run.current;
     try {
-      const assets = await loadMap();
-      if (current !== run.current || !canvas.current) return;
-      view.current = createMapView(canvas.current, focusArea.current, assets, choosePoint, miss, () => motion.current?.matches);
-      view.current.enter(skip);
-      phaseRef.current = 'map';
-      setPhase('map');
+      const painted = await prepareMap();
+      if (!painted || current !== run.current) return;
+      setMapPrepared(true);
+      if (cloudHandoff && !skipRequested.current) {
+        phaseRef.current = 'cloud-exit'; setPhase('cloud-exit');
+      } else {
+        phaseRef.current = 'map'; setPhase('map'); setOpeningMounted(false);
+      }
     } catch {
       if (current !== run.current) return;
       phaseRef.current = 'error';
       setPhase('error');
     }
-  }, [choosePoint, miss]);
+  }, [prepareMap]);
 
   useEffect(() => {
     motion.current = matchMedia('(prefers-reduced-motion: reduce)');
-    if (motion.current.matches) void enterMap(true);
-    const preferenceChanged = () => {
-      if (motion.current.matches) void enterMap(true);
-    };
-    motion.current.addEventListener('change', preferenceChanged);
     return () => {
       run.current++;
-      phaseRef.current = 'flight';
+      phaseRef.current = 'reveal';
       clearTimeout(noteTimer.current);
-      motion.current.removeEventListener('change', preferenceChanged);
       view.current?.destroy();
       view.current = null;
+      preparedMap.current = null;
     };
   }, [enterMap]);
 
@@ -91,20 +122,57 @@ export default function Experience() {
     setShortlist(current => current.filter(candidate => selectionKey(candidate) !== selectionKey(site)));
   }
 
-  const preload = () => { void loadMap().catch(() => {}); };
+  const preload = useCallback(() => {
+    void prepareMap().catch(() => {});
+  }, [prepareMap]);
+  const skipOpening = useCallback(() => { void enterMap(true); }, [enterMap]);
+  const prepareCloudMap = useCallback(() => { void enterMap(false, true); }, [enterMap]);
+  const finishClouds = useCallback(() => {
+    if (phaseRef.current !== 'cloud-exit') return;
+    phaseRef.current = 'map'; setPhase('map'); setOpeningMounted(false);
+  }, []);
+  const layoutOpening = useCallback(progress => {
+    experience.current?.style.setProperty('--country-panel-progress', String(progress));
+  }, []);
+  const departOpening = useCallback(() => {
+    phaseRef.current = 'flight';
+    setPhase('flight');
+  }, []);
+  const showCountryChoice = useCallback(() => {
+    if (phaseRef.current !== 'reveal') return;
+    phaseRef.current = 'country';
+    setPhase('country');
+  }, []);
+  const failOpening = useCallback(() => {
+    openingFailed.current = true;
+    if (phaseRef.current === 'flight' || phaseRef.current === 'cloud-exit') void enterMap(true);
+    else { layoutOpening(1); showCountryChoice(); }
+  }, [enterMap, showCountryChoice, layoutOpening]);
+
+  function chooseCountry() {
+    phaseRef.current = 'flight';
+    setCountryChosen(true);
+    if (openingFailed.current) void enterMap(true);
+  }
 
   function replay() {
     run.current++;
-    phaseRef.current = 'flight';
+    phaseRef.current = 'reveal';
+    openingFailed.current = false;
+    layoutOpening(0);
     view.current?.destroy();
     view.current = null;
+    preparedMap.current = null;
     setSelected(null);
     setNotice('');
-    setPhase('flight');
-    setPaused(false);
-    const player = video.current;
-    player.currentTime = 0;
-    void player.play().catch(() => setPaused(true));
+    setPhase('reveal');
+    setCountryChosen(false);
+    setCountryQuery('');
+    setCountrySearchOpen(false);
+    setOpeningMounted(true);
+    setMapPrepared(false);
+    skipRequested.current = false;
+    setOpeningRun(value => value + 1);
   }
 
   function backToMap() {
@@ -128,15 +196,16 @@ export default function Experience() {
   }
 
   const mapReady = phase === 'map';
+  const countryMatches = 'finland'.startsWith(countryQuery.trim().toLowerCase());
   return (
-    <main className="experience" data-view={selected ? 'analysis' : mapReady ? 'map' : 'flight'}
+    <main ref={experience} className="experience" data-view={selected ? 'analysis' : mapReady ? 'map' : 'flight'}
       onKeyDown={event => { if (event.key === 'Escape' && selected) backToMap(); }}>
       <header className="topbar">
-        <div className="brand"><Icon name="globe" /><span>Earth to Finland</span></div>
+        <div className="brand"><Icon name="globe" /><span>DataX</span></div>
         <div className="toplinks">
           <a href="/legacy/data-package.html">Data &amp; sources <Icon name="upRight" /></a>
           {mapReady && !selected && !motion.current?.matches && (
-            <button className="icon-button replay" title="Replay flight" aria-label="Replay flight" onClick={replay}><Icon name="replay" /></button>
+            <button className="icon-button replay" title="Replay intro" aria-label="Replay intro" onClick={replay}><Icon name="replay" /></button>
           )}
           {selected && <button className="back-button" onClick={backToMap}><Icon name="left" /> Back to map</button>}
         </div>
@@ -145,27 +214,47 @@ export default function Experience() {
       <div className="scene">
         <canvas
           ref={canvas} className="map" tabIndex={mapReady ? 0 : -1} role="region" aria-label="Interactive satellite map of Finland"
-          aria-describedby="map-help" aria-hidden={!mapReady}
+          aria-describedby="map-help" aria-hidden={!mapPrepared}
         />
         <p className="sr-only" id="map-help">Choose a point with the pointer or the site menu. Use arrow keys to move the map cursor and Enter to select. Pinch the trackpad, scroll, or use plus and minus to zoom. Press Home to fit Finland.</p>
-        <video
-          ref={video} className={'flight ' + (mapReady ? 'flight-hidden' : '')}
-          src="/flight/globe.mp4" poster="/flight/globe.webp" autoPlay muted playsInline preload="auto"
-          aria-hidden="true" onEnded={() => enterMap()} onError={() => enterMap(true)}
-          onPlaying={() => { setPaused(false); preload(); }}
-          onLoadedData={() => {
-            if (phaseRef.current === 'flight' && video.current?.paused) {
-              void video.current.play().catch(() => setPaused(true));
-            }
-          }}
-          onSuspend={() => {
-            if (phaseRef.current === 'flight' && video.current?.paused && !video.current.ended) setPaused(true);
-          }}
-        />
+        {openingMounted && <EarthOpening key={openingRun} depart={countryChosen} reveal={phase === 'cloud-exit'}
+          onDepart={departOpening} onChooseReady={showCountryChoice} onLayout={layoutOpening}
+          onComplete={prepareCloudMap} onApproachExit={finishClouds}
+          onReady={preload} onError={failOpening} />}
+
+        {openingMounted && !mapPrepared && phase !== 'loading' && (
+          <aside className="country-landing" aria-hidden={phase !== 'country'} inert={phase !== 'country'}>
+          <div className="country-brand">DataX</div>
+          <section className="country-choice" aria-labelledby="country-heading">
+            <h1 id="country-heading">Choose a<br />country</h1>
+            <form className="country-search" data-expanded={countrySearchOpen && !countryChosen} onBlur={event => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setCountrySearchOpen(false);
+            }} onSubmit={event => {
+              event.preventDefault();
+              if (countrySearchOpen && countryMatches && !countryChosen) chooseCountry();
+            }}>
+              <label className="sr-only" htmlFor="country-search">Search country</label>
+              <input id="country-search" type="search" placeholder="Type..." autoComplete="off"
+                spellCheck={false} value={countryQuery} disabled={countryChosen}
+                onFocus={() => setCountrySearchOpen(true)}
+                onChange={event => setCountryQuery(event.target.value)}
+                onKeyDown={event => { if (event.key === 'Escape') setCountrySearchOpen(false); }}
+                aria-expanded={countrySearchOpen && !countryChosen}
+                aria-controls={countrySearchOpen && !countryChosen ? 'country-results' : undefined} />
+              {countrySearchOpen && !countryChosen && <div id="country-results" className="country-results">
+                {countryMatches ? (
+                  <button className="country-option" type="submit" disabled={countryChosen}>
+                    Finland
+                  </button>
+                ) : <p className="country-empty" role="status">No countries found.</p>}
+              </div>}
+            </form>
+          </section>
+          </aside>
+        )}
 
         {mapReady && !selected && (
           <div className="map-heading">
-            <p className="eyebrow"><span className="signal-dot" /> Data center siting</p>
             <h1>Finland</h1>
             <p className="map-instruction">Select a point to see how it compares as a data center site.</p>
           </div>
@@ -202,10 +291,9 @@ export default function Experience() {
           <div className="flight-controls">
             {phase === 'loading' && <span role="status">Loading Finland…</span>}
             {phase === 'error' && <button className="back-button" onClick={() => enterMap(true)}>Retry map <Icon name="right" /></button>}
-            {phase === 'flight' && (
+            {(phase === 'flight' || phase === 'cloud-exit') && (
               <>
-                {paused && <button className="back-button" onClick={() => void video.current.play().catch(() => enterMap(true))}>Play flight</button>}
-                <button className="back-button" onClick={() => enterMap(true)}>Skip flight <Icon name="right" /></button>
+                <button className="back-button" onClick={skipOpening}>Skip intro <Icon name="right" /></button>
               </>
             )}
           </div>

@@ -1,6 +1,6 @@
-# Earth to Finland
+# DataX
 
-A React and Next.js app for screening potential data center locations in Finland. The Earth flight opens on the night side, fades in city lights, then rotates and descends into a satellite map with national and regional borders. Select a point inside Finland or choose a reference site. On desktop, the country shifts left and a single analysis panel opens on the right. On smaller screens, the panel appears below the map.
+A React and Next.js app for screening potential data center locations in Finland. The opening reuses the approved real-time Three.js Earth scene: approximately 7.67 seconds from complete darkness through stationary isolated lights, a growing city network and a night-to-day turn under fixed lighting. Earth first appears in the center with no selection UI, then an ivory landing panel with black “Choose a country” text and a search field slides in from the left, narrowing the space viewport and moving Earth right. Selecting Finland starts an orbital approach, smoothly centering the globe. The camera approaches the existing cloud cover over 5 seconds and crosses it over 3 seconds, using the approved `/lab/approach` effect. The interactive map prepares behind the scene during the opening and is revealed through the clearing clouds with national and regional borders. Select a point inside Finland or choose a reference site. On desktop, the country shifts left and a single analysis panel opens on the right. On smaller screens, the panel appears below the map.
 
 ## Run on localhost
 
@@ -35,7 +35,7 @@ Use hostnames or IPs without a protocol, port, or path. Separate multiple addres
 
 ## Explore a site
 
-- The globe flight plays once. Use **Skip flight** to go directly to the highlighted country or **Replay flight** to watch again. With reduced motion enabled, the app opens on the map.
+- The globe flight plays once. Use **Skip intro** to go directly to the highlighted country or **Replay intro** to watch again. With reduced motion enabled, the app opens on the map.
 - Click or tap in Finland, or use **Choose a reference site**. On the focused map, the arrow keys move the cursor and Enter selects its point. Pinch the trackpad, scroll, or use the zoom buttons. Pinch with two fingers on touchscreen devices. Zoom follows the gesture position. Use **Fit Finland** to reset the view.
 - The pin shows the selected coordinates. The **Regional reference** label shows the coordinates supplying the bundled statistics for each of Finland’s 19 regions. The Rauma-area marker has its own archived point dataset with partial water data.
 - The siting score shows the model’s weights and links to the highest-ranked region for comparison. The amCharts 5 temperature chart shows annual averages for the NASA POWER historical record (2005–2024) or the modeled scenario (2025–2034). The Chart.js resource chart highlights the strongest month for solar irradiation or wind speed at 100 m.
@@ -56,7 +56,32 @@ The endpoints are `GET /api/regions/[id]?wind=gwa`, `POST /api/point` with JSON 
 ## Project layout
 
 - `app/` contains the Next.js app, canvas map controller, and chart components.
-- `public/flight/` contains the locally served globe animation and poster.
+- `app/lib/earth/` and `app/components/EarthOpening.js` contain the approved live Earth opening and the camera approach to Finland.
+- `public/earth/` contains the local NASA textures and their source manifest.
+- `public/flight/` preserves the old video/poster as unused assets; the active entry page renders no video.
 - `public/legacy/` contains the satellite imagery, geometry, source pages, detailed reports, and regional datasets.
 - `server/v6/` contains the supplied point engine adapted to this project, the area calculation and bundled water-proximity data.
 - `pipeline/` and `tools/` contain the supplied data processing code and data preparation script.
+
+
+## Earth opening provenance and checks
+
+The 11.5-second opening is based on `inestigate-data` and
+`checkpoint/approved-earth-intro`. The latest requested staging restores the
+original city-light clock: a few static lights, slight motion with the network,
+then a stronger night-to-day turn. The sun remains fixed. A coupled camera/world
+orbit starts on the actual night side and ends at the original approved framing;
+Earth and clouds make the local surface turn together. NASA imagery, star seed
+and the exact final camera/world/Earth/cloud pose are preserved.
+A separate 6-second camera approach targets the exact camera/basis/lens used by
+`public/legacy/projection.js`. The map waits through the 570ms crossfade before
+its existing final framing animation. This avoids a direct globe-to-map cut.
+
+Skip bypasses the full sequence. Replay recreates it. Reduced motion opens the
+map without the 3D sequence, and texture/WebGL failure falls back to the map.
+Hidden tabs do not advance the animation. After handoff, the WebGL renderer,
+controls, texture resources and listeners are disposed. Everything is local;
+no scientific data or scoring logic changes. See `docs/earth-opening.md`.
+
+Run `npm test` for the preserved intro/gesture checks and camera-flight regressions.
+`npm run build` validates the production Next.js application.
