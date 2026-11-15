@@ -20,9 +20,9 @@ export function createCloudDepth(source) {
   for (let i = 0; i < CLOUD_DEPTH_LAYERS; i++) {
     const radius = THREE.MathUtils.lerp(1, CLOUD_DEPTH_INNER, i / (CLOUD_DEPTH_LAYERS - 1));
     const material = source.material.clone();
-    // A soft neutral fill lifts gray shadows without changing cloud transmission.
+    // Sunlight alone shapes the globe; the white fill is reserved for close-up immersion.
     material.emissive.set('#ffffff');
-    material.emissiveIntensity = .28;
+    material.emissiveIntensity = 0;
     const opacity = { value: source.material.opacity }, visibility = { value: 1 };
     material.opacity = 1;
     material.onBeforeCompile = shader => {
@@ -48,9 +48,12 @@ export function createCloudDepth(source) {
       group.updateWorldMatrix(true, true);
       inverse.copy(group.matrixWorld).invert();
       camera.getWorldPosition(eye); eye.applyMatrix4(inverse);
+      const cameraRadius = eye.length();
+      const closeUpFill = .28 * (1 - THREE.MathUtils.smootherstep(cameraRadius, 1.004, 1.15));
       for (const layer of layers) {
+        layer.material.emissiveIntensity = closeUpFill;
         layer.opacity.value = source.material.opacity;
-        layer.visibility.value = cloudLayerVisibility(eye.length(), layer.radius);
+        layer.visibility.value = cloudLayerVisibility(cameraRadius, layer.radius);
       }
     },
     dispose() { group.removeFromParent(); for (const layer of layers) layer.material.dispose(); },

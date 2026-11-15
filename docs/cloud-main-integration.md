@@ -11,8 +11,12 @@ The country panel retracts and the space viewport expands during the approach.
 
 The original cloud texture exists from orbit as 24 thin concentric shells.
 Their alpha is normalized to preserve the original combined opacity (0.82 at
-maximum texture density); a neutral-white emissive fill of 0.28 lifts gray
-shading. Each shell clears gently as the camera crosses it. There is no separate
+maximum texture density). From orbit the clouds use the fixed sunlight without
+emissive fill, preserving the dark hemisphere. During approach, a neutral-white
+fill blends smoothly from zero to the approved 0.28 as the camera closes from
+1.15 to 1.004 cloud radii. It remains at 0.28 during cloud entry/exit, lifting
+gray shading without changing alpha. Each shell clears gently as the camera
+crosses it. There is no separate
 procedural overlay and no fading out of the original clouds during approach.
 
 The interactive map loads and paints behind the scene during the opening.

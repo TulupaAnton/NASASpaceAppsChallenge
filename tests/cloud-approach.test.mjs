@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
 import { createCloudApproach, createCloudDeparture, CLOUD_APPROACH_DURATION, CLOUD_APPROACH_CLEARANCE, CLOUD_APPROACH_TARGET, CLOUD_DEPARTURE_DURATION, CLOUD_DEPARTURE_RADIUS } from '../app/lib/earth/cloudApproach.js';
-import { CLOUD_DEPTH_INNER, CLOUD_DEPTH_LAYERS, cloudLayerAlpha, cloudLayerVisibility } from '../app/lib/earth/cloudDepth.js';
+import { CLOUD_DEPTH_INNER, CLOUD_DEPTH_LAYERS, cloudLayerAlpha, cloudLayerVisibility, createCloudDepth } from '../app/lib/earth/cloudDepth.js';
 
 function fixture(reduced = false) {
   const world = new THREE.Group(); world.rotation.z = -.21;
@@ -82,4 +82,35 @@ test('adding depth preserves the original total cloud opacity from above', () =>
   }
   assert.equal(cloudLayerVisibility(1.0006,1),1);
   assert.equal(cloudLayerVisibility(.9999,1),0);
+});
+
+test('clouds follow sunlight in orbit and regain the approved white fill only near the camera', () => {
+  const world = new THREE.Group();
+  const source = new THREE.Mesh(new THREE.SphereGeometry(), new THREE.MeshPhongMaterial({ transparent: true, opacity: .82 }));
+  source.scale.setScalar(1.006);
+  world.add(source);
+  const depth = createCloudDepth(source);
+  const layers = world.children.find(child => child !== source).children;
+  const camera = new THREE.PerspectiveCamera();
+  try {
+    camera.position.set(0, 0, 3.57);
+    depth.update(camera);
+    assert.ok(layers.every(layer => layer.material.emissiveIntensity === 0), 'night-side clouds must not illuminate themselves from orbit');
+    let previous = 0;
+    for (let radius = 1.15; radius >= 1.0005; radius -= .0005) {
+      camera.position.set(0, 0, radius * 1.006);
+      depth.update(camera);
+      const fill = layers[0].material.emissiveIntensity;
+      assert.ok(fill >= previous && fill <= .28);
+      assert.ok(fill - previous < .003, 'close-up fill must blend without a lighting pop');
+      previous = fill;
+    }
+    camera.position.set(0, 0, (1 + CLOUD_APPROACH_CLEARANCE) * 1.006);
+    depth.update(camera);
+    assert.ok(layers.every(layer => layer.material.emissiveIntensity === .28));
+    assert.equal(source.material.opacity, .82, 'lighting must not change cloud transmission');
+    camera.position.set(0, 0, 3.57);
+    depth.update(camera);
+    assert.ok(layers.every(layer => layer.material.emissiveIntensity === 0), 'returning to orbit restores unfilled shading');
+  } finally { depth.dispose(); source.geometry.dispose(); source.material.dispose(); }
 });

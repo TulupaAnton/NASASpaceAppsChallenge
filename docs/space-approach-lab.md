@@ -17,8 +17,9 @@ This second attempt removes the independent procedural cloud overlay entirely.
 The original spherical cloud mesh and its texture remain in place at constant
 opacity from orbit. In this lab, the existing texture is distributed over 24
 thin shells, normalized to preserve its original total opacity from above.
-The lab cloud material has a subtle neutral-white emissive fill (0.28) to lift
-gray shading while leaving opacity and texture transmission unchanged.
+From orbit the cloud material follows sunlight with no emissive fill. Near
+the clouds, a neutral-white fill blends up to the approved 0.28 to lift gray
+shading while leaving opacity and texture transmission unchanged.
 The shells are present from the start. Each near surface clears gently as the
 camera crosses it, avoiding an abrupt single-plane disappearance. The camera
 uses a smoothly eased altitude with no mid-flight time-scale switch. This is
