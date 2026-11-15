@@ -82,13 +82,12 @@ export function comparableScores(a, b) {
   const signature = ({ ranking, meta }) => {
     const weights = ranking.insight?.effective_weights ?? meta?.weights ?? {};
     return JSON.stringify([
-      meta?.country ?? 'fi',
       meta?.scoring_mode,
       meta?.historical_period ?? null,
       meta?.scenario_period ?? null,
       ...factorDefinitions.map(({ key }) => weights[key]),
       [...(ranking.data_quality?.ranking_metrics_used ?? [])].sort(),
-      ranking.extra_metrics?.wind_source_used ?? 'gwa',
+      ranking.extra_metrics?.wind_source_used ?? 'merra2',
     ]);
   };
   return signature(a) === signature(b);

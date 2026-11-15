@@ -136,7 +136,7 @@ export default function Experience({ onLocationSelected } = {}) {
 
   useEffect(() => {
     view.current?.setContext(shortlist);
-  }, [phase, shortlist]);
+  }, [phase, shortlist, countryId]);
 
   function addSite(site) {
     setShortlist(current => current.length < 3 && !current.some(candidate => selectionKey(candidate) === selectionKey(site))
@@ -219,7 +219,6 @@ export default function Experience({ onLocationSelected } = {}) {
       activeCountry.current = id;
       setCountryId(id);
       setSelected(null);
-      setShortlist([]);
       window.scrollTo(0, 0);
       const nextView = replaceMap(assets);
       nextView.enter(true);

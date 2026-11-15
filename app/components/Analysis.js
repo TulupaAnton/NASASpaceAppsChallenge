@@ -154,9 +154,7 @@ function Energy({ report, analysis }) {
     <p className="chart-note">{solar ? 'Annual sunlight' : 'Average wind at 100 m'} <strong>{metric.displayValue}</strong>
     </p>
     {!solar && report.ranking.extra_metrics?.wind_source_used === 'merra2' && (
-      <p className="chart-note">{report.meta?.country === 'ca'
-        ? 'Wind at 100 m is estimated from NASA POWER MERRA-2 data.'
-        : 'Wind estimate from MERRA-2 because Global Wind Atlas was unavailable.'}</p>
+      <p className="chart-note">Wind at 100 m is estimated from NASA POWER MERRA-2 data.</p>
     )}
     {spec.preferred >= 0 ? <DashboardChart key={kind} spec={spec} /> : <p className="chart-placeholder">Monthly data unavailable.</p>}
   </section>;

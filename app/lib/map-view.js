@@ -222,6 +222,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
 
   function paintCandidates() {
     candidates.forEach((site, index) => {
+      if ((site.country ?? 'fi') !== country) return;
       const [x, y] = screen(site.xy);
       if (x < 0 || x > size.width || y < 0 || y > size.height) return;
       ctx.beginPath();
