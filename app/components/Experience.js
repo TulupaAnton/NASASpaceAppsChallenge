@@ -22,7 +22,6 @@ export default function Experience() {
   const [countrySearchOpen, setCountrySearchOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [shortlist, setShortlist] = useState([]);
-  const [mapRadius, setMapRadius] = useState(null);
   const [openingMounted, setOpeningMounted] = useState(true);
   const [openingRun, setOpeningRun] = useState(0);
   const [mapPrepared, setMapPrepared] = useState(false);
@@ -112,8 +111,8 @@ export default function Experience() {
   }, [enterMap]);
 
   useEffect(() => {
-    view.current?.setContext(shortlist, selected ? mapRadius : null);
-  }, [phase, selected, shortlist, mapRadius]);
+    view.current?.setContext(shortlist);
+  }, [phase, shortlist]);
 
   function addSite(site) {
     setShortlist(current => current.length < 3 && !current.some(candidate => selectionKey(candidate) === selectionKey(site))
@@ -263,7 +262,7 @@ export default function Experience() {
           </div>
         )}
 
-        {mapReady && !selected && (
+        {mapReady && (
           <div className="zoom" aria-label="Map controls">
             <button aria-label="Zoom in" title="Zoom in" onClick={() => view.current?.zoom(1.4)}><Icon name="plus" /></button>
             <button aria-label="Zoom out" title="Zoom out" onClick={() => view.current?.zoom(1 / 1.4)}><Icon name="minus" /></button>
@@ -278,7 +277,7 @@ export default function Experience() {
       </div>
 
       {selected && <Analysis site={selected} onChooseSite={chooseReference} shortlist={shortlist}
-        onAdd={addSite} onRemove={removeSite} onMapRadius={setMapRadius} />}
+        onAdd={addSite} onRemove={removeSite} />}
       <footer className="footer">
         <a className="credits" href="/legacy/credits.html">Map credits</a>
         {mapReady ? (

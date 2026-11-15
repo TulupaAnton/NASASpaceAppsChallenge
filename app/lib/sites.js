@@ -23,10 +23,10 @@ export function selection(point, region, site) {
   };
 }
 
-export function pointReport(raw, mode) {
+function pointReport(raw) {
   if (!raw?.point_ranking || !raw.point_charts) throw new Error('The point report is incomplete.');
   return {
-    mode, partial: raw.partial === true, count: raw.total_ranked,
+    mode: 'point', partial: raw.partial === true, count: raw.total_ranked,
     ranking: raw.point_ranking, chart: raw.point_charts, hydro: raw.point_hydro, meta: raw.frontend?.meta ?? raw.meta,
   };
 }
@@ -45,26 +45,43 @@ export function siteLabel(site) {
   return site.name ?? `Point ${site.latitude.toFixed(2)}° N, ${site.longitude.toFixed(2)}° E`;
 }
 
-export async function getSiteReport(site, wind, signal) {
+export const DEFAULT_TIME_RANGE = { startYear: 2005, endYear: 2024, horizonYears: 10 };
+
+export function isDefaultTimeRange(range = DEFAULT_TIME_RANGE) {
+  return range.startYear === DEFAULT_TIME_RANGE.startYear &&
+    range.endYear === DEFAULT_TIME_RANGE.endYear &&
+    range.horizonYears === DEFAULT_TIME_RANGE.horizonYears;
+}
+
+export function timeRangeKey(range = DEFAULT_TIME_RANGE) {
+  return `${range.startYear}-${range.endYear}:${range.horizonYears}`;
+}
+
+export async function getSiteReport(site, signal) {
   const sample = CACHED_POINTS.find(point =>
     Math.abs(site.latitude - point.latitude) < .00005 && Math.abs(site.longitude - point.longitude) < .00005);
-  return readResponse(await fetch(`/api/regions/${sample?.id ?? site.siteId}?wind=${wind}`, { signal }));
+  return readResponse(await fetch(`/api/regions/${sample?.id ?? site.siteId}`, { signal }));
 }
 
-function postReport(endpoint, payload, signal) {
-  return fetch(`/api/${endpoint}`, {
+export async function getExactReport(site, signal, timeRange = DEFAULT_TIME_RANGE) {
+  const response = await fetch('/api/point', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload), signal,
-  }).then(readResponse);
+    body: JSON.stringify({
+      lat: site.latitude,
+      lon: site.longitude,
+      startYear: timeRange.startYear,
+      endYear: timeRange.endYear,
+      horizonYears: timeRange.horizonYears,
+    }),
+    signal,
+  });
+  return pointReport(await readResponse(response));
 }
 
-export async function getExactReport(site, wind, signal) {
-  const raw = await postReport('point', { lat: site.latitude, lon: site.longitude, wind }, signal);
-  return pointReport(raw, 'point');
-}
-
-export function getAreaReport(site, radius, source, wind, signal) {
-  return postReport('area', { lat: site.latitude, lon: site.longitude, radius, source, wind }, signal);
+export function getAnalysisReport(site, exact, signal, timeRange = DEFAULT_TIME_RANGE) {
+  return exact || !isDefaultTimeRange(timeRange)
+    ? getExactReport(site, signal, timeRange)
+    : getSiteReport(site, signal);
 }
 
 export const comparisonColors = ['#a3e7c8', '#ffc477', '#a4bfff'];

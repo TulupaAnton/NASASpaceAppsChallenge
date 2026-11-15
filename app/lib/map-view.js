@@ -1,6 +1,5 @@
-import { IMAGE_HEIGHT, IMAGE_WIDTH, project, unproject } from '../../public/legacy/projection';
-import { comparisonColors, selection, selectionKey, sites } from './sites';
-import { destination } from './geo';
+import { IMAGE_HEIGHT, IMAGE_WIDTH, unproject } from '../../public/legacy/projection';
+import { comparisonColors, selection, sites } from './sites';
 
 const amber = '#ffc477';
 const clamp = (x, min, max) => Math.min(max, Math.max(min, x));
@@ -17,7 +16,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
   let resolvePainted;
   const painted = new Promise(resolve => { resolvePainted = resolve; });
   let drag, pinch, gestureScale;
-  let candidates = [], rings = [];
+  let candidates = [];
   const pointers = new Map();
 
   function flightView() {
@@ -31,22 +30,25 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     return { x: (size.width - IMAGE_WIDTH * k) / 2, y: (size.height - IMAGE_HEIGHT * k) / 2, k };
   }
 
-  function fit() {
-    const { width, height } = size;
-    const mobile = width < 940;
-    let left = 0, top = 0, availableWidth = width, availableHeight = height;
+  function viewport() {
     if (selected && focusArea.clientWidth) {
-      left = focusArea.offsetLeft;
-      top = focusArea.offsetTop;
-      availableWidth = focusArea.clientWidth;
-      availableHeight = focusArea.clientHeight;
+      return {
+        left: focusArea.offsetLeft, top: focusArea.offsetTop,
+        width: focusArea.clientWidth, height: focusArea.clientHeight,
+      };
     }
-    const usableHeight = availableHeight * (selected ? .87 : (mobile ? .69 : .83));
-    const k = Math.min((availableWidth - 42) / (east - west), usableHeight / (south - north));
+    return { left: 0, top: 0, width: size.width, height: size.height };
+  }
+
+  function fit() {
+    const { left, top, width, height } = viewport();
+    const mobile = size.width < 940;
+    const usableHeight = height * (selected ? .87 : (mobile ? .69 : .83));
+    const k = Math.min((width - 42) / (east - west), usableHeight / (south - north));
     const offsetY = selected ? -5 : (mobile ? 27 : 4);
     return {
-      x: left + availableWidth / 2 - centerX * k,
-      y: top + availableHeight / 2 - centerY * k + offsetY, k,
+      x: left + width / 2 - centerX * k,
+      y: top + height / 2 - centerY * k + offsetY, k,
     };
   }
 
@@ -203,37 +205,9 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     ctx.restore();
   }
 
-  function setContext(nextCandidates, area) {
+  function setContext(nextCandidates) {
     candidates = nextCandidates;
-    const points = !area || !selected ? [] : area.compare ? candidates : [selected];
-    rings = points.map(site => {
-      const ring = new Path2D();
-      for (let step = 0; step < 64; step++) {
-        const point = destination(site.latitude, site.longitude, area.radius, step * 360 / 64);
-        const [x, y] = project(point.lon, point.lat);
-        if (step) ring.lineTo(x, y);
-        else ring.moveTo(x, y);
-      }
-      ring.closePath();
-      const index = candidates.findIndex(candidate => selectionKey(candidate) === selectionKey(site));
-      return { ring, color: comparisonColors[index] ?? amber };
-    });
     schedule();
-  }
-
-  function paintAreas() {
-    if (!rings.length) return;
-    ctx.save();
-    ctx.translate(view.x, view.y);
-    ctx.scale(view.k, view.k);
-    ctx.globalAlpha = borders * .72;
-    ctx.lineWidth = 1.6 / view.k;
-    ctx.setLineDash([5 / view.k, 4 / view.k]);
-    for (const { ring, color } of rings) {
-      ctx.strokeStyle = color;
-      ctx.stroke(ring);
-    }
-    ctx.restore();
   }
 
   function paintCandidates() {
@@ -335,9 +309,18 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     if (dirty) {
       const { width, height, dpr } = size;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.save();
+      if (selected && isolation === 1) {
+        const map = viewport();
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, width, height);
+        ctx.beginPath();
+        ctx.rect(map.left, map.top, map.width, map.height);
+        ctx.clip();
+      }
       paintMap(width, height);
-      paintAreas();
       paintPoints(width, height);
+      ctx.restore();
       dirty = false;
       if (resolvePainted) { resolvePainted(true); resolvePainted = undefined; }
     }
@@ -350,6 +333,10 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
   }
 
   function locate([x, y], tolerance) {
+    if (selected && isolation === 1) {
+      const map = viewport();
+      if (x < map.left || x > map.left + map.width || y < map.top || y > map.top + map.height) return null;
+    }
     let nearest, distance = tolerance;
     for (const site of sites) {
       const [px, py] = screen(site.xy);
@@ -375,12 +362,13 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
   }
 
   function constrain(next) {
-    const marginX = size.width * .17;
-    const marginY = size.height * .16;
+    const { left, top, width, height } = viewport();
+    const marginX = width * .17;
+    const marginY = height * .16;
     return {
       k: next.k,
-      x: clamp(next.x, marginX - east * next.k, size.width - marginX - west * next.k),
-      y: clamp(next.y, marginY - south * next.k, size.height - marginY - north * next.k),
+      x: clamp(next.x, left + marginX - east * next.k, left + width - marginX - west * next.k),
+      y: clamp(next.y, top + marginY - south * next.k, top + height - marginY - north * next.k),
     };
   }
 
@@ -388,18 +376,19 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     transition = undefined;
     zoomTarget = undefined;
     borders = 1;
-    isolation = 0;
+    isolation = selected ? 1 : 0;
   }
 
   function zoom(factor, pivot) {
-    if (!active || selected) return;
+    if (!active) return;
     const fitted = fit();
     if (factor === 1) {
-      animate(fitted, 1, 0, 320);
+      animate(fitted, 1, selected ? 1 : 0, 320);
       return;
     }
     const current = zoomTarget ?? view;
-    const [x, y] = pivot ?? [size.width / 2, size.height / 2];
+    const { left, top, width, height } = viewport();
+    const [x, y] = pivot ?? [left + width / 2, top + height / 2];
     const k = clamp(current.k * factor, fitted.k, fitted.k * 5);
     const target = k === fitted.k ? fitted : constrain({
       x: x - (x - current.x) * k / current.k, y: y - (y - current.y) * k / current.k, k,
@@ -427,7 +416,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
   }
 
   function pointerDown(event) {
-    if (!active || event.button !== 0 || (selected && pointers.size)) return;
+    if (!active || event.button !== 0) return;
     keyboard = undefined;
     hover = undefined;
     zoomTarget = undefined;
@@ -461,7 +450,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
       const dx = position[0] - drag.start[0];
       const dy = position[1] - drag.start[1];
       drag.moved ||= Math.hypot(dx, dy) > 5;
-      if (!selected && drag.moved) {
+      if (drag.moved) {
         stopCamera();
         view = constrain({ ...drag.view, x: drag.view.x + dx, y: drag.view.y + dy });
         canvas.style.cursor = 'grabbing';
@@ -493,7 +482,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
   }
 
   function wheel(event) {
-    if (!active || selected || !event.deltaY) return;
+    if (!active || !event.deltaY) return;
     if (!event.ctrlKey && Math.abs(event.deltaX) > 1.3 * Math.abs(event.deltaY)) return;
     if (event.cancelable) event.preventDefault();
     if (gestureScale !== undefined) return;
@@ -504,7 +493,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
   }
 
   function gestureStart(event) {
-    if (!active || selected) return;
+    if (!active) return;
     event.preventDefault();
     gestureScale = event.scale || 1;
   }
@@ -528,10 +517,14 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     if (!active || event.ctrlKey || event.metaKey || event.altKey) return;
     const movement = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
     if (movement || event.key === 'Enter' || event.key === ' ') {
-      keyboard ??= screen(sites[0].xy);
+      const { left, top, width, height } = viewport();
+      keyboard ??= screen(selected?.xy ?? sites[0].xy);
       if (movement) {
         const step = event.shiftKey ? 25 : 8;
-        keyboard = keyboard.map((value, index) => clamp(value + movement[index] * step, 5, (index ? size.height : size.width) - 5));
+        keyboard = [
+          clamp(keyboard[0] + movement[0] * step, left + 5, left + width - 5),
+          clamp(keyboard[1] + movement[1] * step, top + 5, top + height - 5),
+        ];
       } else pick(keyboard);
       schedule();
     } else if (event.key === '+' || event.key === '=') zoom(1.35);

@@ -1,104 +1,163 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import { annualTemperatures, months } from '../lib/chart-data';
-import { coordinates, number } from '../lib/format';
-import { comparisonColors, getAreaReport, getExactReport, getSiteReport, selectionKey, siteLabel } from '../lib/sites';
-import { areaMetrics, RadiusPicker } from './AreaAnalysis';
+import { coordinates } from '../lib/format';
+import { deltaText, unknown, valueText } from '../lib/analysis-format';
+import { comparableScores, factorDefinitions, metricDefinitions, normalizeAnalysis, sourceLabel } from '../lib/site-analysis';
+import {
+  comparisonColors, DEFAULT_TIME_RANGE, getAnalysisReport, isDefaultTimeRange, selectionKey, siteLabel, timeRangeKey,
+} from '../lib/sites';
+import DashboardChart from './DashboardChartLazy';
+import Disclosure from './Disclosure';
 
-const ComparisonChart = dynamic(() => import('./ComparisonChart'), { ssr: false });
-const scoreMetric = { key: 'score', title: 'V6 siting score', unit: 'points' };
-
-const modes = [
-  ['reference', 'Site references (bundled)'],
-  ['point', 'Exact points (live)'],
-  ['area', 'Areas (bundled references)'],
-  ['live-area', 'Areas (live NASA POWER)'],
+const chartMetrics = [
+  { key: 'temp', label: 'Air temperature', unit: '°C', axis: 'Annual air temperature (°C)' },
+  { key: 'solar', label: 'Monthly sunlight', unit: 'kWh/m²', axis: 'Sunlight (kWh/m² per month)', field: 'solar_kwh_m2' },
+  { key: 'wind', label: 'Wind at 100 m', unit: 'm/s', axis: 'Wind at 100 m (m/s)', field: 'wind_speed_100m_ms' },
+];
+const dash = [undefined, [7, 4], [2, 4]];
+const letters = ['A', 'B', 'C'];
+const detailFactors = [
+  ['cooling', 'Cooling demand indicator', 0, 'cooling_within_climate', false],
+  ['summer_heat', 'Summer heat indicator', 0, 'cooling_within_climate', true],
+  ['solar', 'Solar resource', 1, 'solar_within_renewables', false],
+  ['wind', 'Wind resource', 1, 'solar_within_renewables', true],
+  ['water_distance', 'Modeled water proximity', 2, 'water_distance_within_water', false],
+  ['water_discharge', 'River flow estimate', 2, 'water_distance_within_water', true],
 ];
 
-const measurementKeys = {
-  temperature: 'historical_mean_temp_c',
-  solar: 'solar_ghi_kwh_m2_year',
-  wind: 'wind_speed_100m_ms',
-};
-
-function loadComparison(site, wind, mode, radius, signal) {
-  if (mode === 'point') return getExactReport(site, wind, signal);
-  if (mode === 'area' || mode === 'live-area') return getAreaReport(site, radius, mode === 'area' ? 'bundled' : 'live', wind, signal);
-  return getSiteReport(site, wind, signal);
+function strongestInput(baseline, candidate, weights, factorIndex) {
+  const before = baseline.ranking;
+  const after = candidate.ranking;
+  const leftWeights = before.insight?.effective_weights ?? baseline.meta?.weights ?? {};
+  const rightWeights = after.insight?.effective_weights ?? candidate.meta?.weights ?? {};
+  let largest;
+  for (const [key, label, index, split, remainder] of detailFactors) {
+    if (index !== factorIndex || !Number.isFinite(leftWeights[split]) || leftWeights[split] !== rightWeights[split]) continue;
+    if (!Number.isFinite(before.scores[key]) || !Number.isFinite(after.scores[key])) continue;
+    const change = (after.scores[key] - before.scores[key]) * weights[index].weight *
+      (remainder ? 1 - leftWeights[split] : leftWeights[split]);
+    if (!largest || Math.abs(change) > Math.abs(largest.change)) largest = { label, change };
+  }
+  return largest;
 }
 
-function summaryValue(report, key) {
-  if (key === 'score') return report?.ranking?.scores?.overall;
-  return report?.metrics?.[key]?.mean ?? report?.ranking?.measurements?.[measurementKeys[key]];
-}
-
-function comparableScores(reports, mode) {
-  if (mode !== 'reference' && mode !== 'point') return false;
-  if (reports.some(report => report?.partial || !Number.isFinite(summaryValue(report, 'score')))) return false;
-  const signature = report => {
-    const weights = report.ranking.insight?.effective_weights ?? report.meta?.weights ?? {};
-    const indicators = [...(report.ranking.data_quality?.ranking_metrics_used ?? [])].sort();
-    const wind = report.ranking.extra_metrics?.wind_source_used ?? report.ranking.sources?.wind?.split(' (')[0];
-    return JSON.stringify([[weights.climate, weights.renewables, weights.water], indicators, wind]);
-  };
-  return new Set(reports.map(signature)).size === 1;
-}
-
-function basis(report, mode) {
-  if (mode === 'reference') return report?.mode === 'archive'
-    ? 'Archived point data'
-    : report?.ranking?.region ? report.ranking.region.split(' (')[0] + ' reference' : 'Regional reference';
-  if (mode === 'point') return 'Exact coordinates';
-  if (!report) return 'Area samples';
-  return `${report.coverage.used} ${report.coverage.used === 1 ? 'sample' : 'samples'}` +
-    (report.source === 'live' ? ` of ${report.coverage.planned} planned` : '');
-}
-
-function ComparisonPlot({ reports, candidates, metric }) {
-  const { labels, datasets, hasValues } = useMemo(() => {
-    const chartRows = reports.map(report => metric.key === 'temperature'
-      ? annualTemperatures(report?.chart?.historical_monthly ?? [])
-      : report?.chart?.monthly_climatology ?? []);
-    const years = [...new Set(chartRows.flatMap(rows => rows.map(row => row.year)))].filter(Boolean).sort();
-    const readMonthly = row => metric.key === 'solar' ? row?.solar_kwh_m2 : row?.wind_speed_ms ?? row?.wind_speed_100m_ms;
-    const labels = metric.key === 'score' ? candidates.map((_, index) => String.fromCharCode(65 + index))
-      : metric.key === 'temperature' ? years.map(String) : months;
-    const datasets = metric.key === 'score' ? [{
-      label: 'Siting score', data: reports.map(report => summaryValue(report, 'score')),
-      siteLabels: candidates.map(siteLabel),
-      backgroundColor: comparisonColors, borderRadius: 5, maxBarThickness: 58,
-    }] : chartRows.map((rows, index) => {
-      const values = metric.key === 'temperature'
-        ? years.map(year => rows.find(row => row.year === year)?.temperature ?? null)
-        : months.map((_, month) => readMonthly(rows.find(row => row.month === month + 1)) ?? null);
+function TrendPlot({ candidates, reports }) {
+  const [choice, setChoice] = useState('temp');
+  const metric = chartMetrics.find(item => item.key === choice);
+  const spec = useMemo(() => {
+    const isTemp = metric.key === 'temp';
+    const rows = reports.map(report => isTemp
+      ? annualTemperatures(report?.chart.historical_monthly ?? [])
+      : report?.chart.monthly_climatology ?? []);
+    const years = [...new Set(rows.flatMap(series => series.map(row => row.year)))].sort();
+    const series = rows.map((data, i) => {
+      const values = new Map(data.map(row => isTemp ? [row.year, row.temperature] : [row.month, row[metric.field]]));
       return {
-        label: siteLabel(candidates[index]), data: values, borderColor: comparisonColors[index],
-        backgroundColor: comparisonColors[index], borderWidth: 2.5, pointRadius: 2,
-        pointHoverRadius: 5, spanGaps: false,
+        label: letters[i] + ' · ' + siteLabel(candidates[i]), tone: comparisonColors[i], dash: dash[i],
+        data: (isTemp ? years : months.map((_, month) => month + 1)).map(key => values.get(key) ?? null),
       };
     });
-    return { labels, datasets, hasValues: datasets.filter(dataset => dataset.data.some(Number.isFinite)).length >= (metric.key === 'score' ? 1 : 2) };
+    return {
+      type: 'line', title: metric.label + ' comparison', labels: isTemp ? years.map(String) : months,
+      unit: metric.unit, axisLabel: metric.axis, series, markers: true, tickLimit: 6, zero: !isTemp,
+    };
   }, [reports, candidates, metric]);
-  return hasValues ? <ComparisonChart labels={labels} datasets={datasets} metric={metric} />
-    : <p className="chart-placeholder">At least two sites need data for this chart.</p>;
+  const showChart = spec.series.filter(series => series.data.some(Number.isFinite)).length >= 2;
+
+  return <section className="card">
+    <div className="chart-heading">
+      <h2>Compare trends</h2>
+      <label className="chart-metric"><span className="sr-only">Chart metric</span>
+        <select value={choice} onChange={event => setChoice(event.target.value)}>
+          {chartMetrics.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
+        </select>
+      </label>
+    </div>
+    <ul className="plot-legend" aria-label="Chart series">
+      {candidates.map((site, i) => <li key={selectionKey(site)} style={{ '--candidate': comparisonColors[i] }}>
+        <span>{letters[i]}</span> {siteLabel(site)}
+      </li>)}
+    </ul>
+    {showChart ? <DashboardChart key={choice} spec={spec} /> : <p className="chart-placeholder">At least two sites need data for this chart.</p>}
+  </section>;
 }
 
-export default function Comparison({ candidates, remove, wind, mode, onMode, radius, onRadius }) {
-  const [selectedMetric, setSelectedMetric] = useState('temperature');
+function deltaValue(metric, base, current) {
+  if (!Number.isFinite(base?.value) || !Number.isFinite(current?.value) ||
+    (metric.key === 'scoring_water_proximity' && (base.value === 20 || current.value === 20))) return unknown;
+  return deltaText(current.value - base.value, metric.unit);
+}
+
+function Difference({ candidates, analyses, reports, differences }) {
+  const baseline = analyses[0];
+  const spec = useMemo(() => differences.some(item => item.factors) ? ({
+    type: 'bar', title: 'Weighted score changes compared with A', horizontal: true,
+    unit: 'points', axisLabel: 'Change from A (score points)', zero: true, labels: factorDefinitions.map(item => item.label),
+    series: differences.filter(item => item.factors).map(({ index, factors }) => ({
+      label: letters[index] + ' vs A', tone: comparisonColors[index], data: factors,
+    })),
+  }) : null, [differences]);
+
+  return <section className="card">
+    <h2>Differences from A</h2>
+    <div className="delta-grid">
+      {differences.map(({ index, factors }) => {
+        const current = analyses[index];
+        const strongest = factors?.reduce((best, change, i) => Math.abs(change) > Math.abs(factors[best]) ? i : best, 0);
+        const input = factors && strongestInput(reports[0], reports[index], baseline.score.factors, strongest);
+        return <section className="delta-card" key={selectionKey(candidates[index])}>
+          <h3>{letters[index]} · {siteLabel(candidates[index])}</h3>
+          {factors && Math.abs(factors[strongest]) > 0 && <p className="delta-driver">
+            Largest score driver <strong>{factorDefinitions[strongest].label} {deltaText(factors[strongest], 'points')}</strong>
+            {input && <> · {input.label} {deltaText(input.change, 'points')}</>}
+          </p>}
+          <dl className="delta-values">
+            {metricDefinitions.map((metric, i) => <div key={metric.key}>
+              <dt>{metric.label}</dt><dd>{deltaValue(metric, baseline?.metrics[i], current?.metrics[i])}</dd>
+            </div>)}
+          </dl>
+        </section>;
+      })}
+    </div>
+    {spec && <DashboardChart spec={spec} />}
+  </section>;
+}
+
+function RawMeasurements({ candidates, analyses, reports }) {
+  return <Disclosure label="View underlying measurements">
+    <div className="delta-grid">
+      {candidates.map((site, index) => <section className="delta-card" key={selectionKey(site)}>
+        <h3>{letters[index]} · {siteLabel(site)}</h3>
+        <p>{sourceLabel(reports[index])}</p>
+        <dl className="delta-values">
+          {metricDefinitions.map((metric, i) => <div key={metric.key}>
+            <dt>{metric.label}</dt><dd>{analyses[index]?.metrics[i]?.displayValue ?? unknown}</dd>
+          </div>)}
+        </dl>
+      </section>)}
+    </div>
+  </Disclosure>;
+}
+
+export default function Comparison({ candidates, remove, leader, onChooseSite, timeRange = DEFAULT_TIME_RANGE }) {
   const [result, setResult] = useState(null);
   const [attempt, setAttempt] = useState(0);
-  const key = [mode, radius, wind, attempt, ...candidates.map(selectionKey)].join(':');
+  const rangeKey = timeRangeKey(timeRange);
+  const key = [attempt, rangeKey, ...candidates.map(site => selectionKey(site) + ':' + site.exact)].join(':');
   const count = candidates.length;
   const current = result?.key === key ? result : null;
-  const isArea = mode.endsWith('area');
-  const reports = current?.reports;
 
   useEffect(() => {
     if (count < 2) return;
     const controller = new AbortController();
-    Promise.allSettled(candidates.map(site => loadComparison(site, wind, mode, radius, controller.signal)))
+    const useCachedReport = isDefaultTimeRange(timeRange);
+    Promise.allSettled(
+      candidates.map(site => (useCachedReport && site.report)
+        ? site.report
+        : getAnalysisReport(site, site.exact, controller.signal, timeRange)),
+    )
       .then(outcomes => {
         if (!controller.signal.aborted) setResult({
           key,
@@ -107,87 +166,69 @@ export default function Comparison({ candidates, remove, wind, mode, onMode, rad
         });
       });
     return () => controller.abort();
-  }, [candidates, count, key, mode, radius, wind]);
+  }, [candidates, count, key, timeRange]);
 
-  const showScores = reports && comparableScores(reports, mode);
-  const metrics = showScores ? [...areaMetrics, scoreMetric] : areaMetrics;
-  const metric = metrics.find(item => item.key === selectedMetric) ?? metrics[0];
-  const windHeight = mode === 'live-area' ? 50 : 100;
-  const bestScore = showScores ? Math.max(...reports.map(report => summaryValue(report, 'score'))) : null;
-  const bestSites = showScores ? candidates.filter((_, index) => summaryValue(reports[index], 'score') === bestScore) : [];
+  const reports = current?.reports;
+  const { analyses, differences, equal } = useMemo(() => {
+    if (!reports) return { analyses: [], differences: [], equal: false };
+    const analyses = reports.map((report, i) => report ? normalizeAnalysis(report, candidates[i]) : null);
+    const baseline = analyses[0];
+    const differences = analyses.slice(1).map((analysis, i) => {
+      const index = i + 1;
+      const comparable = comparableScores(reports[0], reports[index]);
+      const gap = comparable ? analysis.score.total - baseline.score.total : null;
+      const factors = comparable && analysis.score.factors.every((factor, j) => factor.contribution !== null &&
+        baseline.score.factors[j].contribution !== null)
+        ? analysis.score.factors.map((factor, j) => factor.contribution - baseline.score.factors[j].contribution)
+        : null;
+      return { index, gap, factors };
+    });
+    const scores = analyses.map(item => item?.score.total);
+    const equal = differences.every(item => item.gap !== null) && Math.max(...scores) - Math.min(...scores) < 2;
+    return { analyses, differences, equal };
+  }, [reports, candidates]);
 
   return <>
     <section className="card compare-controls">
-      <div className="chart-heading"><h2>Compare up to three locations</h2><span className="scope-title">{count} / 3</span></div>
-      <p className="chart-note">Select places on the map or from the site menu, then add them with <strong>Add to comparison</strong>.</p>
-      <div className="filter-row">
-        <label className="wind-picker field"><span>Compare using</span>
-          <select value={mode} onChange={event => onMode(event.target.value)}>
-            {modes.map(([value, text]) => <option value={value} key={value}>{text}</option>)}
-          </select>
-        </label>
-        {isArea && <RadiusPicker radius={radius} onRadius={onRadius} />}
-      </div>
-      {isArea && <p className="chart-note">Each circle uses the same radius and data source. The results summarize samples from 2005–2024.</p>}
-      {mode === 'point' && <p className="chart-note">Live point analysis uses the supplied v6 engine. Data availability varies by location.</p>}
+      <div className="chart-heading"><h2>Compare locations</h2><span className="scope-title">{count} / 3 · {timeRange.startYear}–{timeRange.endYear} (+{timeRange.horizonYears}y)</span></div>
+      <p className="chart-note">Select locations on the map or use the site menu, then choose Add to comparison.</p>
+      {leader && count < 3 && !candidates.some(site => site.siteId === leader.site_id) && (
+        <button type="button" className="text-button compare-benchmark" onClick={() => onChooseSite(leader.site_id)}>
+          Select regional benchmark · {leader.region?.split(' (')[0]} {valueText(leader.scores?.overall)} / 100
+        </button>
+      )}
       {count > 0 && <ol className="compare-sites">
-        {candidates.map((site, index) => <li key={selectionKey(site)} style={{ '--candidate': comparisonColors[index] }}>
-          <span className="candidate-letter" aria-hidden="true">{String.fromCharCode(65 + index)}</span>
-          <div><b>{siteLabel(site)}</b><p>{coordinates(site.latitude, site.longitude)}</p></div>
-          <button className="text-button" onClick={() => remove(site)} aria-label={`Remove ${siteLabel(site)} from comparison`}>Remove</button>
+        {candidates.map((site, i) => <li key={selectionKey(site)} style={{ '--candidate': comparisonColors[i] }}>
+          <span className="candidate-letter" aria-hidden="true">{letters[i]}</span>
+          <div>
+            <strong>{siteLabel(site)}</strong>
+            <p className="mono">{coordinates(site.latitude, site.longitude)}</p>
+            {reports?.[i] && <p>{sourceLabel(reports[i])}{i === 0 ? ' · Baseline' : ''}</p>}
+          </div>
+          <button type="button" className="text-button" onClick={() => remove(site)} aria-label={`Remove ${siteLabel(site)} from comparison`}>Remove</button>
         </li>)}
       </ol>}
     </section>
-    {count < 2 && <p className="card" role="status">Add at least two locations to see the comparison.</p>}
-    {count >= 2 && !current && <p className="card" role="status">{mode.startsWith('live') || mode === 'point' ? 'Fetching live comparison data…' : 'Loading comparison…'}</p>}
+    {count < 2 && <p className="card" role="status">Add at least two locations to compare them.</p>}
+    {count >= 2 && !current && <p className="card" role="status">Loading comparison…</p>}
     {current && <>
-      <section className="card">
-        <div className="chart-heading">
-          <h2>Compare on the same scale</h2>
-          <label className="wind-picker field"><span className="sr-only">Chart metric</span>
-            <select value={metric.key} onChange={event => setSelectedMetric(event.target.value)}>
-              {metrics.map(option => <option value={option.key} key={option.key}>{option.title}</option>)}
-            </select>
-          </label>
-        </div>
-        <p className="chart-note">
-          {metric.key === 'temperature' ? 'Annual averages (°C)' : metric.key === 'solar' ? 'Typical monthly sunlight (kWh/m²)'
-            : metric.key === 'wind' ? `Typical monthly wind at ${windHeight} m (m/s)` : '0–100 points. Higher scores rank better under the model.'}
-        </p>
-        <ComparisonPlot reports={reports} candidates={candidates} metric={metric} />
+      <section className="card comparison-verdict">
+        <div className="chart-heading"><h2>{equal ? 'Essentially equal' : 'Score differences'}</h2>
+          <span className="scope-title">A · Baseline</span></div>
+        <p className="chart-note">{equal ? 'All selected scores are within 2 points.' : 'Differences use A as the baseline.'}</p>
+        <ul>{differences.map(({ index, gap }) => <li key={index}>
+          <strong>{letters[index]} · {siteLabel(candidates[index])}</strong>
+          <span>{gap === null ? 'Scores unavailable or use different inputs'
+            : `${deltaText(gap, 'points')}${!equal && Math.abs(gap) < 2 ? ' · Essentially equal to A' : ''}`}</span>
+        </li>)}</ul>
       </section>
-      <section className="card">
-        <h2>Side-by-side measurements</h2>
-        <div className="comparison-table-wrap">
-          <table className="comparison-table">
-            <thead><tr><th scope="col">Metric</th>{candidates.map((site, index) =>
-              <th scope="col" key={selectionKey(site)}><span style={{ color: comparisonColors[index] }}>{String.fromCharCode(65 + index)}</span> {siteLabel(site)}</th>,
-            )}</tr></thead>
-            <tbody>
-              <tr><th scope="row">Data represented</th>{reports.map((report, index) => <td key={index}>{basis(report, mode)}</td>)}</tr>
-              {metrics.map(({ key, title, unit }) => <tr key={key}>
-                <th scope="row">{title}{key === 'wind' ? ` at ${windHeight} m` : ''}</th>
-                {reports.map((report, index) => <td key={index}>{number(summaryValue(report, key), unit)}</td>)}
-              </tr>)}
-              {!isArea && <tr><th scope="row">Estimated distance to water</th>
-                {reports.map((report, index) => {
-                  const distance = report?.ranking?.measurements?.water_distance_km;
-                  return <td key={index}>{distance === 20 ? 'Beyond 12 km survey' : number(distance, 'km')}</td>;
-                })}
-              </tr>}
-            </tbody>
-          </table>
-        </div>
-        {showScores && <p className="chart-note"><strong>{bestSites.map(siteLabel).join(' and ')}</strong> {bestSites.length > 1 ? 'tie for the highest score' : 'has the highest score'} in this comparison at {number(bestScore)} / 100.</p>}
-        {!showScores && <p className="chart-note">{isArea
-          ? 'Area averages compare climate and energy measurements. V6 scores apply to individual sites.'
-          : 'A score comparison requires complete scores with the same inputs and weights.'}</p>}
-        {reports.some(report => report?.coverage?.used === 0) && <p className="chart-note">A circle has no bundled references. Increase the radius or choose live NASA POWER.</p>}
-        {current.errors.some(Boolean) && <div className="chart-note" role="status">
-          {current.errors.map((error, index) => error && <p key={index}>{siteLabel(candidates[index])} · {error}</p>)}
-          <button className="text-button" onClick={() => setAttempt(value => value + 1)}>Retry comparison</button>
-        </div>}
-      </section>
+      <TrendPlot candidates={candidates} reports={reports} />
+      <Difference candidates={candidates} analyses={analyses} reports={reports} differences={differences} />
+      <RawMeasurements candidates={candidates} analyses={analyses} reports={reports} />
+      {current.errors.some(Boolean) && <div className="card" role="status">
+        {current.errors.map((error, i) => error && <p key={i}>{siteLabel(candidates[i])} · {error}</p>)}
+        <button type="button" className="text-button" onClick={() => setAttempt(value => value + 1)}>Retry comparison</button>
+      </div>}
     </>}
   </>;
 }

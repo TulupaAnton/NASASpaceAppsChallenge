@@ -60,7 +60,7 @@ The endpoints are `GET /api/regions/[id]?wind=gwa`, `POST /api/point` with JSON 
 - `public/earth/` contains the local NASA textures and their source manifest.
 - `public/flight/` preserves the old video/poster as unused assets; the active entry page renders no video.
 - `public/legacy/` contains the satellite imagery, geometry, source pages, detailed reports, and regional datasets.
-- `server/v6/` contains the supplied point engine adapted to this project, the area calculation and bundled water-proximity data.
+- `server/v6/` contains the point engine with selectable historical periods and forecast horizons, regional reports, and bundled water-proximity data.
 - `pipeline/` and `tools/` contain the supplied data processing code and data preparation script.
 
 
@@ -85,3 +85,8 @@ no scientific data or scoring logic changes. See `docs/earth-opening.md`.
 
 Run `npm test` for the preserved intro/gesture checks and camera-flight regressions.
 `npm run build` validates the production Next.js application.
+
+The analysis panel is integrated from `origin/main-dontDelete` at `e4f85c6`.
+It includes history/forecast controls, screening-score contributions, expandable
+charts and methodology, and site comparison. See `docs/analysis-panel-integration.md`
+for the imported scope and preserved opening behavior.

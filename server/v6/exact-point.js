@@ -1,16 +1,8 @@
 // Point analysis engine from the supplied v6 archive.
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { getCatalog } from './catalog.js';
-const COARSE_NASA_TOL_DEG = 0.15;
 const MAX_CACHE_ENTRIES = 200;
 const FETCH_TIMEOUT_MS = 18_000;
-const FINLAND_BOUNDS = {
-    minLat: 59.4,
-    maxLat: 70.2,
-    minLon: 19.0,
-    maxLon: 31.6
-};
 const WEIGHTS = {
     climate: 0.25,
     climate_no_water: 0.30,
@@ -20,7 +12,7 @@ const WEIGHTS = {
     solar_within_renewables: 0.40,
     water_distance_within_water: 0.70
 };
-export const PHYSICAL_REFERENCE_BOUNDS = {
+const PHYSICAL_REFERENCE_BOUNDS = {
     cooling: {
         low: 150,
         high: 2500,
@@ -65,9 +57,6 @@ function clamp(value, min, max) {
 function daysInMonth(year, month) {
     return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
-function isInFinland(lat, lon) {
-    return lat >= FINLAND_BOUNDS.minLat && lat <= FINLAND_BOUNDS.maxLat && lon >= FINLAND_BOUNDS.minLon && lon <= FINLAND_BOUNDS.maxLon;
-}
 function haversineKm(lat1, lon1, lat2, lon2) {
     const r = 6371.0088;
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -91,24 +80,6 @@ function pruneMap(map, maxSize) {
         if (firstKey === undefined) break;
         map.delete(firstKey);
     }
-}
-function pointKey(lat, lon, windSource, includeBaseline) {
-    return `${lat.toFixed(4)}:${lon.toFixed(4)}:${windSource}:${includeBaseline}`;
-}
-function findCoarseNasaCache(lat, lon) {
-    let best = null;
-    for (const entry of nasaCoarseCache.values()){
-        if (Math.abs(entry.lat - lat) <= COARSE_NASA_TOL_DEG && Math.abs(entry.lon - lon) <= COARSE_NASA_TOL_DEG) {
-            const dist = haversineKm(lat, lon, entry.lat, entry.lon);
-            if (!best || dist < best.dist) {
-                best = {
-                    dist,
-                    params: entry.parameters
-                };
-            }
-        }
-    }
-    return best?.params ?? null;
 }
 async function fetchJsonWithTimeout(url, init = {}, timeoutMs = FETCH_TIMEOUT_MS) {
     const controller = new AbortController();
@@ -141,15 +112,7 @@ async function fetchJsonWithTimeout(url, init = {}, timeoutMs = FETCH_TIMEOUT_MS
         }
     }
 }
-export async function fetchNasaPowerMonthly(lat, lon, signal, allowNearby = true) {
-    const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
-    const cached = nasaCoarseCache.get(key)?.parameters ?? (allowNearby ? findCoarseNasaCache(lat, lon) : null);
-    if (cached) {
-        return {
-            parameters: cached,
-            fromCoarseCache: true
-        };
-    }
+async function fetchNasaPowerMonthly(lat, lon, signal) {
     const paramsList = [
         'T2M',
         'T2M_MAX_AVG',
@@ -169,18 +132,7 @@ export async function fetchNasaPowerMonthly(lat, lon, signal, allowNearby = true
     if (!parameter || !parameter.T2M) {
         throw new Error('NASA POWER Monthly API returned empty parameter payload.');
     }
-    const normalized = parameter;
-    pruneMap(nasaCoarseCache, MAX_CACHE_ENTRIES);
-    nasaCoarseCache.set(key, {
-        lat,
-        lon,
-        parameters: normalized,
-        cachedAt: Date.now()
-    });
-    return {
-        parameters: normalized,
-        fromCoarseCache: false
-    };
+    return parameter;
 }
 function extractGwaPercentile(areaMeans, targetPerc) {
     if (!Array.isArray(areaMeans) || areaMeans.length === 0) return undefined;
@@ -638,29 +590,35 @@ function weightedAverage(items) {
     }
     return den > 0 ? round(num / den, 3) : null;
 }
-export async function analyzeExactPoint({ lat, lon, windSource = 'gwa', includeBaseline = true, signal }) {
-    const cacheKey = pointKey(lat, lon, windSource, includeBaseline);
-    const cached = pointCache.get(cacheKey)?.response;
+export async function analyzeExactPoint({ lat, lon, startYear = 2005, endYear = 2024, horizonYears = 10, signal }) {
+    const coordKey = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+    const cacheKey = `${coordKey}:${startYear}-${endYear}:${horizonYears}`;
+    const cached = pointCache.get(cacheKey);
     if (cached) return cached;
-    const inFinland = isInFinland(lat, lon);
-    const [nasaRes, gwaRes, terrain, water, hydroIndex] = await Promise.all([
-        fetchNasaPowerMonthly(lat, lon, signal),
-        windSource === 'gwa' ? fetchGwa100mWithRetry(lat, lon, signal) : Promise.resolve(null),
-        fetchTerrainStencil(lat, lon, signal),
-        fetchWaterPrecision(lat, lon, signal),
-        inFinland ? loadFinlandWaterIndex() : Promise.resolve(null)
-    ]);
-    const pointHydro = hydroIndex && inFinland ? queryFinlandHydroProximity(hydroIndex, lat, lon) : null;
-    const params = nasaRes.parameters;
-    const t2mRows = getParamSeries(params, 'T2M', 2005, 2024);
-    const t2mMaxAvgRows = getParamSeries(params, 'T2M_MAX_AVG', 2005, 2024);
-    const solarRows = getParamSeries(params, 'ALLSKY_SFC_SW_DWN', 2005, 2024);
-    const clrSolarRows = getParamSeries(params, 'CLRSKY_SFC_SW_DWN', 2005, 2024);
-    const rhRows = getParamSeries(params, 'RH2M', 2005, 2024);
-    const wetRows = getParamSeries(params, 'T2MWET', 2005, 2024);
-    const precipRows = getParamSeries(params, 'PRECTOTCORR', 2005, 2024);
-    const ws10Rows = getParamSeries(params, 'WS10M', 2005, 2024);
-    const ws50Rows = getParamSeries(params, 'WS50M', 2005, 2024);
+    let rawInputs = nasaCoarseCache.get(coordKey);
+    if (!rawInputs) {
+        const [params, gwaRes, terrain, water, hydroIndex] = await Promise.all([
+            fetchNasaPowerMonthly(lat, lon, signal),
+            fetchGwa100mWithRetry(lat, lon, signal),
+            fetchTerrainStencil(lat, lon, signal),
+            fetchWaterPrecision(lat, lon, signal),
+            loadFinlandWaterIndex()
+        ]);
+        rawInputs = { params, gwaRes, terrain, water, hydroIndex };
+        pruneMap(nasaCoarseCache, MAX_CACHE_ENTRIES);
+        nasaCoarseCache.set(coordKey, rawInputs);
+    }
+    const { params, gwaRes, terrain, water, hydroIndex } = rawInputs;
+    const pointHydro = hydroIndex ? queryFinlandHydroProximity(hydroIndex, lat, lon) : null;
+    const t2mRows = getParamSeries(params, 'T2M', startYear, endYear);
+    const t2mMaxAvgRows = getParamSeries(params, 'T2M_MAX_AVG', startYear, endYear);
+    const solarRows = getParamSeries(params, 'ALLSKY_SFC_SW_DWN', startYear, endYear);
+    const clrSolarRows = getParamSeries(params, 'CLRSKY_SFC_SW_DWN', startYear, endYear);
+    const rhRows = getParamSeries(params, 'RH2M', startYear, endYear);
+    const wetRows = getParamSeries(params, 'T2MWET', startYear, endYear);
+    const precipRows = getParamSeries(params, 'PRECTOTCORR', startYear, endYear);
+    const ws10Rows = getParamSeries(params, 'WS10M', startYear, endYear);
+    const ws50Rows = getParamSeries(params, 'WS50M', startYear, endYear);
     if (t2mRows.length < 24) {
         throw new Error('Insufficient NASA POWER temperature history at this coordinate.');
     }
@@ -687,15 +645,17 @@ export async function analyzeExactPoint({ lat, lon, windSource = 'gwa', includeB
         };
     });
     const nHist = t2mRows.length;
+    const scenarioStartYear = endYear + 1;
+    const scenarioEndYear = endYear + horizonYears;
     const scenarioMonthly = [];
     const scenarioYearBlocks = [];
     const warmestMonthMaxAvgByYear = [];
-    for(let y = 2025; y <= 2034; y++){
+    for(let y = scenarioStartYear; y <= scenarioEndYear; y++){
         let yearTempSum = 0;
         let yearDd10 = 0;
         let yearMaxAvgPeak = -Infinity;
         for(let m = 1; m <= 12; m++){
-            const idx = nHist + (y - 2025) * 12 + (m - 1);
+            const idx = nHist + (y - scenarioStartYear) * 12 + (m - 1);
             const anomaly = olsT2m.slopePerMonth * (idx - olsT2m.meanCenter);
             const normal = olsT2m.seasonalNormals[m - 1];
             const t2mProj = normal + anomaly;
@@ -721,8 +681,15 @@ export async function analyzeExactPoint({ lat, lon, windSource = 'gwa', includeB
             cooling_pressure_dd10: round(yearDd10, 3)
         });
     }
-    const splitIdx = t2mRows.findIndex((r)=>r.year >= 2019);
-    const trainCount = splitIdx > 24 ? splitIdx : Math.floor(nHist * 0.7);
+    const isDefaultHist = startYear === 2005 && endYear === 2024;
+    let splitIdx = isDefaultHist ? t2mRows.findIndex((r)=>r.year >= 2019) : -1;
+    if (splitIdx <= 24) {
+        const targetTrain = Math.floor(nHist * 0.7);
+        const splitYear = t2mRows[Math.min(nHist - 1, Math.max(24, targetTrain))]?.year;
+        const yearBoundary = splitYear !== undefined ? t2mRows.findIndex((r)=>r.year >= splitYear) : -1;
+        splitIdx = yearBoundary >= 24 && nHist - yearBoundary >= 12 ? yearBoundary : Math.floor(nHist * 0.7);
+    }
+    const trainCount = Math.min(nHist - 1, Math.max(12, splitIdx));
     const trainVals = t2mVals.slice(0, trainCount);
     const trainMonths = t2mMonths.slice(0, trainCount);
     const trainOls = fitSeasonalOls(trainVals, trainMonths);
@@ -768,25 +735,31 @@ export async function analyzeExactPoint({ lat, lon, windSource = 'gwa', includeB
     const precipAnnualMm = precipRows.length > 0 ? round(precipRows.reduce((a, b)=>a + b.value * daysInMonth(b.year, b.month), 0) / Math.max(1, new Set(precipRows.map((r)=>r.year)).size), 1) : null;
     const ws10Mean = ws10Rows.length > 0 ? ws10Rows.reduce((a, b)=>a + b.value, 0) / ws10Rows.length : 3.0;
     const ws50Mean = ws50Rows.length > 0 ? ws50Rows.reduce((a, b)=>a + b.value, 0) / ws50Rows.length : 4.5;
-    const rawAlpha = ws10Mean > 0.2 && ws50Mean > ws10Mean ? Math.log(ws50Mean / ws10Mean) / Math.log(50 / 10) : 0.2;
-    const shearAlpha = clamp(rawAlpha, 0.05, 0.45);
-    const factor50To100 = (100 / 50) ** shearAlpha;
-    const ws50ByMonth = new Array(12).fill(0);
-    const ws50MonthCounts = new Array(12).fill(0);
-    for (const r of ws50Rows){
-        ws50ByMonth[r.month - 1] += r.value;
-        ws50MonthCounts[r.month - 1] += 1;
-    }
-    const merra2Monthly100m = ws50ByMonth.map((s, idx)=>round((ws50MonthCounts[idx] > 0 ? s / ws50MonthCounts[idx] : ws50Mean) * factor50To100, 4));
-    const merra2Speed100m = round(ws50Mean * factor50To100, 3);
     const histMeanTemp = t2mVals.reduce((a, b)=>a + b, 0) / t2mVals.length;
-    const airDensity = 1.225 * (288.15 / (273.15 + histMeanTemp)) * Math.exp(-terrain.elevationM / 8400);
-    const merra2PowerDensity = round(0.5 * airDensity * (6 / Math.PI) * (merra2Monthly100m.reduce((acc, v)=>acc + v ** 3, 0) / 12), 2);
-    const usedGwa = windSource === 'gwa' && gwaRes !== null;
-    const windSpeed100m = usedGwa ? round(gwaRes.windSpeed100m, 2) : merra2Speed100m;
-    const windPowerDensity = usedGwa ? round(gwaRes.powerDensity100m, 2) : merra2PowerDensity;
-    const gwaScale = usedGwa && merra2Speed100m > 0 ? gwaRes.windSpeed100m / merra2Speed100m : 1;
-    const windMonthly100m = usedGwa && gwaRes.monthlyWind100m ? gwaRes.monthlyWind100m : merra2Monthly100m.map((v)=>round(v * gwaScale, 4));
+    const usedGwa = gwaRes !== null;
+    let windSpeed100m = usedGwa ? round(gwaRes.windSpeed100m, 2) : null;
+    let windPowerDensity = usedGwa ? round(gwaRes.powerDensity100m, 2) : null;
+    let windMonthly100m = gwaRes?.monthlyWind100m;
+    if (!windMonthly100m) {
+        const rawAlpha = ws10Mean > 0.2 && ws50Mean > ws10Mean ? Math.log(ws50Mean / ws10Mean) / Math.log(5) : 0.2;
+        const factor50To100 = 2 ** clamp(rawAlpha, 0.05, 0.45);
+        const ws50ByMonth = new Array(12).fill(0);
+        const counts = new Array(12).fill(0);
+        for (const { month, value } of ws50Rows) {
+            ws50ByMonth[month - 1] += value;
+            counts[month - 1]++;
+        }
+        const estimatedSpeed = round(ws50Mean * factor50To100, 3);
+        const scale = usedGwa && estimatedSpeed > 0 ? gwaRes.windSpeed100m / estimatedSpeed : 1;
+        const estimatedMonthly = ws50ByMonth.map((sum, index) =>
+            round((counts[index] ? sum / counts[index] : ws50Mean) * factor50To100, 4));
+        windMonthly100m = estimatedMonthly.map(value => round(value * scale, 4));
+        if (!usedGwa) {
+            const airDensity = 1.225 * (288.15 / (273.15 + histMeanTemp)) * Math.exp(-terrain.elevationM / 8400);
+            windPowerDensity = round(0.5 * airDensity * (6 / Math.PI) * (estimatedMonthly.reduce((sum, value)=>sum + value ** 3, 0) / 12), 2);
+            windSpeed100m = estimatedSpeed;
+        }
+    }
     const monthlyClimatology = Array.from({
         length: 12
     }, (_, idx)=>({
@@ -880,14 +853,6 @@ export async function analyzeExactPoint({ lat, lon, windSource = 'gwa', includeB
             'water_discharge'
         ] : []
     ];
-    let rank = null;
-    let totalRanked = 0;
-    if (includeBaseline && scoreOverall !== null) {
-        const cohort = getCatalog(windSource).ranking;
-        totalRanked = cohort.length;
-        const higherCount = cohort.filter((r)=>typeof r.scores.overall === 'number' && r.scores.overall > scoreOverall).length;
-        rank = higherCount + 1;
-    }
     const slopeDecade = round(olsT2m.slopePerMonth * 120, 5);
     const seDecade = olsT2m.sePerMonth * 120;
     const siteId = `pt_${lat.toFixed(4)}_${lon.toFixed(4)}`;
@@ -914,11 +879,6 @@ export async function analyzeExactPoint({ lat, lon, windSource = 'gwa', includeB
         prectotcorr_mm_year: precipAnnualMm,
         ws10m_mean_ms: round(ws10Mean, 3),
         ws50m_mean_ms: round(ws50Mean, 3),
-        merra2_wind_power_density_w_m2: merra2PowerDensity,
-        merra2_wind_speed_100m_ms: merra2Speed100m,
-        merra2_wind_monthly_ms: merra2Monthly100m,
-        merra2_shear_alpha: round(shearAlpha, 3),
-        merra2_air_density_kg_m3: round(airDensity, 3),
         ...usedGwa ? {
             gwa_wind_power_density_w_m2: round(gwaRes.powerDensity100m, 2),
             gwa_wind_speed_100m_ms: round(gwaRes.windSpeed100m, 2),
@@ -929,8 +889,7 @@ export async function analyzeExactPoint({ lat, lon, windSource = 'gwa', includeB
                 gwa_windiest_10pct_wind_speed_100m_ms: round(gwaRes.windiest10Speed100m, 2)
             } : {}
         } : {},
-        wind_source_used: usedGwa ? 'gwa' : 'merra2',
-        cache_source: nasaRes.fromCoarseCache ? 'coarse_nasa_0.15deg' : 'live_api'
+        wind_source_used: usedGwa ? 'gwa' : 'merra2'
     };
     const strengths = [];
     const limitations = [];
@@ -969,7 +928,7 @@ export async function analyzeExactPoint({ lat, lon, windSource = 'gwa', includeB
     const pointRanking = {
         site_id: siteId,
         region: `Exact coordinates (${lat.toFixed(4)}, ${lon.toFixed(4)})`,
-        rank,
+        rank: null,
         lat: round(lat, 4),
         lon: round(lon, 4),
         scores: {
@@ -1004,8 +963,8 @@ export async function analyzeExactPoint({ lat, lon, windSource = 'gwa', includeB
             slope_deg: terrain.slopeDeg
         },
         sources: {
-            climate: 'NASA POWER Monthly API (MERRA-2, 2m height, 2005-01..2024-12, https://power.larc.nasa.gov/api/temporal/monthly/point)',
-            solar: 'NASA POWER Monthly API (CERES ALLSKY_SFC_SW_DWN, 2005-01..2024-12, converted to kWh/m2)',
+            climate: `NASA POWER Monthly API (MERRA-2, 2m height, ${startYear}-01..${endYear}-12, https://power.larc.nasa.gov/api/temporal/monthly/point)`,
+            solar: `NASA POWER Monthly API (CERES ALLSKY_SFC_SW_DWN, ${startYear}-01..${endYear}-12, converted to kWh/m2)`,
             wind: usedGwa ? `DTU Global Wind Atlas v3.3 (100m height, box_deg=${gwaRes.boxDeg})` : 'NASA POWER MERRA-2 (vertical extrapolation from WS10M & WS50M to 100m)',
             terrain: terrain.source,
             water: water.source
@@ -1036,7 +995,7 @@ export async function analyzeExactPoint({ lat, lon, windSource = 'gwa', includeB
                 t2mRows[trainCount - 1].date
             ],
             test_period: [
-                t2mRows[trainCount]?.date ?? '2019-01',
+                t2mRows[trainCount]?.date ?? `${endYear}-01`,
                 t2mRows[nHist - 1].date
             ],
             monthly_mae_trend_c: round(maeTrend, 4),
@@ -1067,14 +1026,14 @@ export async function analyzeExactPoint({ lat, lon, windSource = 'gwa', includeB
     };
     const meta = {
         historical_period: [
-            '2005-01',
-            '2024-12'
+            `${startYear}-01`,
+            `${endYear}-12`
         ],
         scenario_period: [
-            '2025-01',
-            '2034-12'
+            `${scenarioStartYear}-01`,
+            `${scenarioEndYear}-12`
         ],
-        ranked_sites: includeBaseline ? totalRanked : 1,
+        ranked_sites: 1,
         weights: {
             climate: effectiveClimateWeight,
             renewables: effectiveRenewablesWeight,
@@ -1095,16 +1054,9 @@ export async function analyzeExactPoint({ lat, lon, windSource = 'gwa', includeB
             water: waterObj
         },
         meta,
-        total_ranked: includeBaseline ? totalRanked : 1
+        total_ranked: 1
     };
     pruneMap(pointCache, MAX_CACHE_ENTRIES);
-    pointCache.set(cacheKey, {
-        lat,
-        lon,
-        windSource,
-        includeBaseline,
-        response,
-        cachedAt: Date.now()
-    });
+    pointCache.set(cacheKey, response);
     return response;
 }

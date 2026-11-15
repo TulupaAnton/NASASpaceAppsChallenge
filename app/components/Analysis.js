@@ -1,282 +1,355 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { coordinates, number, regionName } from '../lib/format';
+import { coordinates } from '../lib/format';
 import { annualTemperatures, months, resourceKey } from '../lib/chart-data';
-import { getExactReport, getSiteReport, selectionKey } from '../lib/sites';
-import AreaAnalysis from './AreaAnalysis';
+import { deltaText, percentText, probabilityText, significanceText, slopeText, unknown, valueText } from '../lib/analysis-format';
+import { factorDefinitions, normalizeAnalysis, sourceLabel } from '../lib/site-analysis';
+import {
+  DEFAULT_TIME_RANGE, getAnalysisReport, isDefaultTimeRange, selectionKey, siteLabel, timeRangeKey,
+} from '../lib/sites';
 import Comparison from './Comparison';
+import DashboardChart from './DashboardChartLazy';
+import Disclosure from './Disclosure';
 import { Icon } from './Icon';
 
-const loadingChart = () => <p className="chart-placeholder" role="status">Loading chart…</p>;
-const TemperatureChart = dynamic(() => import('./TemperatureChart'), { ssr: false, loading: loadingChart });
-const SeasonalChart = dynamic(() => import('./SeasonalChart'), { ssr: false, loading: loadingChart });
-const scoreGroups = [
-  ['Cooling climate', 'climate', 'mint'],
-  ['Wind and solar', 'renewables', 'amber'],
-  ['Water resources', 'water', 'blue'],
+const HISTORY_PRESETS = [
+  { label: '2005–2024', startYear: 2005, endYear: 2024 },
+  { label: '1984–2024', startYear: 1984, endYear: 2024 },
+  { label: '2015–2024', startYear: 2015, endYear: 2024 },
 ];
-const historyText = {
-  observed: ['Observed', 'historical_monthly'],
-  modeled: ['Model scenario', 'scenario_monthly'],
-};
-const trendNumber = new Intl.NumberFormat('en', { maximumFractionDigits: 2, signDisplay: 'exceptZero' });
-const noRows = [];
+const HORIZON_OPTIONS = [5, 10, 15, 20];
+const ALL_YEARS = Array.from({ length: 2024 - 1984 + 1 }, (_, i) => 1984 + i);
 
-function Score({ report, onChooseSite }) {
-  const { ranking, count, partial, leader } = report;
-  const { scores, rank } = ranking;
-  const weights = ranking.insight?.effective_weights ?? report.meta?.weights;
-  const showLeader = leader && leader.site_id !== ranking.site_id;
-  const gap = showLeader ? leader.scores.overall - scores?.overall : 0;
+function TimeWindowControls({ timeRange, onChange }) {
+  const { startYear, endYear, horizonYears } = timeRange;
+  const activePreset = HISTORY_PRESETS.find(
+    preset => preset.startYear === startYear && preset.endYear === endYear,
+  );
 
-  return (
-    <section className="card score-card">
-      <div className="score-top">
-        <div>
-          <h2>Siting score</h2>
-          {partial || !Number.isFinite(scores?.overall) ? (
-            <p className="card-note">{report.mode === 'archive' ? 'This archived point has incomplete water data.' : 'This point has incomplete data.'} A total score is unavailable.</p>
-          ) : (
-            <div className="score-head">
-              <strong>{number(scores.overall)}<small> / 100</small></strong>
-              {Number.isFinite(rank) && count > 1 && <span className="rank">Rank {rank} of {count}</span>}
-            </div>
-          )}
-        </div>
-        {weights && <p className="score-explanation">Higher scores rank better. Each factor is scored out of 100, then weighted to calculate the total.</p>}
+  return <section className="card time-controls" aria-label="Time range and forecast horizon">
+    <div className="time-controls-row">
+      <span className="time-controls-label">History</span>
+      <div className="toggle" role="group" aria-label="Historical period presets">
+        {HISTORY_PRESETS.map(preset => (
+          <button
+            type="button"
+            key={preset.label}
+            aria-pressed={activePreset?.label === preset.label}
+            onClick={() => onChange({ ...timeRange, startYear: preset.startYear, endYear: preset.endYear })}
+          >
+            {preset.label}
+          </button>
+        ))}
       </div>
-      <dl className="scores">
-        {scoreGroups.filter(([, key]) => Number.isFinite(scores?.[key])).map(([label, key, color]) => (
-          <div className={'score-row ' + color} key={key}>
-            <dt>{label} {Number.isFinite(weights?.[key]) && <span>{number(weights[key] * 100)}% weight</span>}</dt>
-            <dd>{number(scores[key])} / 100</dd>
-            <dd className="score-track" aria-hidden="true"><span style={{ width: Math.min(100, Math.max(0, scores[key])) + '%' }} /></dd>
-          </div>
-        ))}
-      </dl>
-      {showLeader && (
-        <div className="leader">
-          <div>
-            <p>Highest-scoring region</p>
-            <strong>{regionName(leader.region)} · {number(leader.scores.overall)} / 100</strong>
-            {gap > 0 && <span className="leader-gap">{number(gap)} points higher</span>}
-          </div>
-          <button className="back-button" type="button" onClick={() => onChooseSite(leader.site_id)}>Explore this region <Icon name="right" /></button>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function Measurements({ report }) {
-  const m = report.ranking.measurements ?? {};
-  const values = [
-    ['Average air temperature', number(m.historical_mean_temp_c, '°C'), 'Cooler air can reduce cooling demand.'],
-    ['Annual sunlight', number(m.solar_ghi_kwh_m2_year, 'kWh/m²'), 'More sunlight increases solar potential.'],
-    ['Wind speed at 100 m', number(m.wind_speed_100m_ms, 'm/s'), 'Stronger wind can support more generation.'],
-    ['Estimated distance to water', m.water_distance_km === 20 ? 'Beyond 12 km survey' : number(m.water_distance_km, 'km'), 'Nearby water can support some cooling systems.'],
-  ];
-
-  return (
-    <section className="card measurement-card">
-      <h2>What affects this site?</h2>
-      <dl className="measurements">
-        {values.map(([label, value, meaning]) => (
-          <div key={label}><dt>{label}</dt><dd>{value}</dd><dd className="measurement-meaning">{meaning}</dd></div>
-        ))}
-      </dl>
-    </section>
-  );
-}
-
-function Toggle({ label, options, current, onChange }) {
-  return (
-    <div className="toggle" role="group" aria-label={label}>
-      {options.map(([value, text]) => (
-        <button key={value} type="button" aria-pressed={current === value} onClick={() => onChange(value)}>{text}</button>
-      ))}
+      <div className="time-selects">
+        <label>
+          <span className="sr-only">Start year</span>
+          <select
+            aria-label="From year"
+            value={startYear}
+            onChange={event => onChange({ ...timeRange, startYear: Number(event.target.value) })}
+          >
+            {ALL_YEARS.filter(y => y <= endYear - 2).map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </label>
+        <span aria-hidden="true">–</span>
+        <label>
+          <span className="sr-only">End year</span>
+          <select
+            aria-label="To year"
+            value={endYear}
+            onChange={event => onChange({ ...timeRange, endYear: Number(event.target.value) })}
+          >
+            {ALL_YEARS.filter(y => y >= startYear + 2).map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </label>
+      </div>
     </div>
-  );
+    <div className="time-controls-row">
+      <span className="time-controls-label">Forecast</span>
+      <div className="toggle" role="group" aria-label="Forecast horizon">
+        {HORIZON_OPTIONS.map(years => (
+          <button
+            type="button"
+            key={years}
+            aria-pressed={horizonYears === years}
+            onClick={() => onChange({ ...timeRange, horizonYears: years })}
+          >
+            {years}y
+          </button>
+        ))}
+      </div>
+      <span className="chart-note time-controls-span">
+        {endYear - startYear + 1}y history · {endYear + 1}–{endYear + horizonYears} scenario
+      </span>
+    </div>
+  </section>;
 }
 
-function Temperature({ report }) {
+function rankVerdict(rank, count, customWindow) {
+  if (customWindow && rank === null) {
+    return 'Cohort rank disabled for custom time windows (calibrated only for 2005–2024, 10y).';
+  }
+  if (rank === null || !count) return 'Site estimate · Unranked';
+  if (rank <= count / 3) return 'Near the top of the regional ranking';
+  if (rank <= count * 2 / 3) return 'Middle of the regional ranking';
+  return 'Lower in the regional ranking';
+}
+
+function ScoreSummary({ analysis, report, customWindow }) {
+  const { total, rank, ofTotal, factors } = analysis.score;
+  const spec = useMemo(() => ({
+    type: 'bar', title: 'How the factors build the score', unit: 'points',
+    axisLabel: 'Score points out of 100', horizontal: true, compact: true, stacked: true,
+    labels: ['Contributions'], limits: { min: 0, max: 100 },
+    series: factors.map((factor, index) => ({
+      label: factor.label, tone: factorDefinitions[index].tone, data: [factor.contribution], stack: 'score',
+    })),
+  }), [factors]);
+  const available = total !== null;
+  const knownFactors = factors.filter(factor => factor.contribution !== null && factor.weight !== null);
+  const strongest = knownFactors.reduce((best, factor) => !best || factor.contribution > best.contribution ? factor : best, null);
+  const limiting = knownFactors.reduce((worst, factor) =>
+    !worst || factor.weight * 100 - factor.contribution > worst.weight * 100 - worst.contribution ? factor : worst, null);
+
+  return <section className="card score-overview" aria-label="Site overview">
+    <div className="overview-head">
+      <div>
+        <h2>Screening score</h2>
+        {available ? <>
+          <div className="score-head">
+            <strong>{valueText(total)}<small> / 100</small></strong>
+            {rank !== null && <span className="rank">Rank {rank} of {ofTotal}</span>}
+          </div>
+          <p className="overview-verdict">{rankVerdict(rank, ofTotal, customWindow)}</p>
+        </> : <p className="overview-verdict">Score unavailable · Incomplete site data</p>}
+      </div>
+      <div className="overview-source">
+        <span className="scope-title">{sourceLabel(report)}</span>
+        <p className="mono">{coordinates(analysis.coordinates.latitude, analysis.coordinates.longitude)}</p>
+      </div>
+    </div>
+
+    <dl className="factor-legend">
+      {factors.map(({ key, label, contribution }, index) => (
+        <div key={key} data-tone={factorDefinitions[index].tone}>
+          <dt><i aria-hidden="true" />{label}</dt>
+          <dd>{contribution === null ? unknown : deltaText(contribution, 'points')}</dd>
+          <dd className="factor-explanation">{factorDefinitions[index].explanation}</dd>
+        </div>
+      ))}
+    </dl>
+    {available && knownFactors.length === factors.length && <DashboardChart spec={spec} />}
+    {available && strongest && <p className="overview-reasons">
+      <strong>{strongest.label}</strong> contribute most to the score.
+      {limiting && limiting !== strongest && <> <strong>{limiting.label}</strong> limit the score most.</>}
+    </p>}
+  </section>;
+}
+
+function Toggle({ label, options, current, change }) {
+  return <div className="toggle" role="group" aria-label={label}>
+    {options.map(([value, text]) => (
+      <button type="button" key={value} aria-pressed={current === value} onClick={() => change(value)}>{text}</button>
+    ))}
+  </div>;
+}
+
+function Temperature({ report, analysis }) {
   const [kind, setKind] = useState('observed');
-  const monthly = report.chart[historyText[kind][1]] ?? noRows;
-  const rows = useMemo(() => annualTemperatures(monthly), [monthly]);
-  const period = rows.length ? rows[0].year + '–' + rows.at(-1).year : '';
-  const trend = report.ranking.trend;
-  const slope = trend?.slope_c_per_decade;
-  const adjusted = Number.isFinite(trend?.p_value_fdr_bh);
-  const significant = adjusted ? trend.significant_fdr05 : trend?.significant_p05;
+  const historical = kind === 'observed';
+  const monthly = historical ? report.chart.historical_monthly : report.chart.scenario_monthly;
+  const spec = useMemo(() => {
+    const observations = annualTemperatures(monthly ?? []);
+    const fitted = historical
+      ? new Map(annualTemperatures((monthly ?? []).map(row => ({ ...row, t2m_c: row.seasonal_trend_c })))
+        .map(row => [row.year, row.temperature]))
+      : new Map();
+    const series = [{
+      label: historical ? 'Historical estimate' : 'Scenario', data: observations.map(row => row.temperature),
+      tone: historical ? 'mint' : 'muted', fill: historical, dash: historical ? undefined : [5, 4],
+    }];
+    if ([...fitted.values()].some(Number.isFinite)) series.push({
+      label: 'Fitted trend', tone: 'mint', dash: [5, 4], data: observations.map(row => fitted.get(row.year) ?? null),
+    });
+    return {
+      type: 'line', title: historical ? 'Observed annual air temperature' : 'Scenario annual air temperature',
+      labels: observations.map(row => String(row.year)), unit: '°C', axisLabel: 'Air temperature (°C)',
+      series, tickLimit: 6,
+    };
+  }, [historical, monthly]);
+  const trend = analysis.trend;
+  const mean = analysis.metrics[0];
 
-  return (
-    <section className="card chart-card">
-      <div className="chart-heading">
-        <h2><Icon name="temp" /> Annual air temperature</h2>
-        <span className="unit">°C</span>
-      </div>
-      <div className="chart-toolbar">
-        <p>{period}</p>
-        <Toggle label="Temperature series" options={Object.entries(historyText).map(([value, [label]]) => [value, label])}
-          current={kind} onChange={setKind} />
-      </div>
-      {rows.some(row => Number.isFinite(row.temperature))
-        ? <TemperatureChart rows={rows} modeled={kind === 'modeled'} />
-        : <p className="chart-placeholder">Temperature series unavailable.</p>}
-      {kind === 'observed' && Number.isFinite(slope) && (
-        <p className="chart-note" title={adjusted ? 'Trend test adjusted for the number of regions compared.' : undefined}>
-          Estimated change <strong>{trendNumber.format(slope)} °C per decade.</strong>
-          {' '}{significant === true
-            ? 'The analysis detected a long-term trend.'
-            : significant === false ? 'The evidence for a long-term trend is uncertain.' : ''}
-        </p>
-      )}
-      {kind === 'modeled' && <p className="chart-note">Scenario assuming the historical trend and seasonal patterns continue.</p>}
-    </section>
-  );
+  return <section className="detail-section">
+    <div className="chart-heading">
+      <h3><Icon name="temp" /> Annual air temperature</h3>
+      <Toggle label="Temperature view" options={[[ 'observed', 'Observed' ], ['scenario', 'Scenario']]} current={kind} change={setKind} />
+    </div>
+    <p className="chart-note">
+      {historical ? <>Historical mean <strong>{mean.displayValue}</strong></> : 'Illustrates how temperatures could change if the historical pattern continues.'}
+    </p>
+    {historical && <p className="chart-note">
+      Trend <strong>{slopeText(trend.slopePerDecade)}</strong> · {significanceText(trend.isSignificant)}
+      {spec.series.length > 1 && <> · Dashed line shows the fitted trend</>}
+    </p>}
+    {spec.series[0].data.some(Number.isFinite)
+      ? <DashboardChart key={kind} spec={spec} />
+      : <p className="chart-placeholder">Annual temperature data unavailable.</p>}
+  </section>;
 }
 
-function Seasonality({ report }) {
+function Energy({ report, analysis }) {
   const [kind, setKind] = useState('solar');
-  const rows = report.chart.monthly_climatology ?? noRows;
-  const key = resourceKey(kind);
-  const peak = rows.reduce((best, row) => Number.isFinite(row[key]) && (!best || row[key] > best[key]) ? row : best, null);
-  const unit = kind === 'solar' ? 'kWh/m²' : 'm/s';
-  return (
-    <section className="card chart-card">
-      <div className="chart-heading">
-        <h2><Icon name="sun" /> Solar and wind by month</h2>
-        <span className="unit">{unit}</span>
-      </div>
-      <div className="chart-toolbar">
-        <p>{kind === 'solar' ? 'Average monthly sunlight' : 'Average wind at 100 m'}</p>
-        <Toggle label="Resource series" options={[['solar', 'Solar'], ['wind', 'Wind']]} current={kind} onChange={setKind} />
-      </div>
-      {peak ? <>
-        <SeasonalChart rows={rows} kind={kind} peakMonth={peak.month} />
-        <p className="chart-note">Highest monthly average <strong>{months[peak.month - 1]} · {number(peak[key], unit)}</strong>.</p>
-      </> : <p className="chart-placeholder">Monthly resource data unavailable.</p>}
-    </section>
-  );
+  const solar = kind === 'solar';
+  const rows = report.chart.monthly_climatology;
+  const spec = useMemo(() => {
+    const values = (rows ?? []).map(month => month[resourceKey(kind)]);
+    const peak = values.reduce((best, value, i) => Number.isFinite(value) && (best === -1 || value > values[best]) ? i : best, -1);
+    return {
+      type: 'bar', title: solar ? 'Monthly sunlight' : 'Monthly wind at 100 m',
+      unit: solar ? 'kWh/m²' : 'm/s', axisLabel: solar ? 'Sunlight (kWh/m² per month)' : 'Wind at 100 m (m/s)',
+      labels: (rows ?? []).map(month => months[month.month - 1]), markers: false, zero: true, preferred: peak,
+      peakLabel: true,
+      series: [{ label: solar ? 'Sunlight' : 'Wind at 100 m', tone: 'amber', data: values, peak }],
+    };
+  }, [kind, rows, solar]);
+  const metric = analysis.metrics[solar ? 1 : 2];
+
+  return <section className="detail-section">
+    <div className="chart-heading">
+      <h3><Icon name="sun" /> Energy resources by month</h3>
+      <Toggle label="Energy resource" options={[[ 'solar', 'Solar' ], [ 'wind', 'Wind' ]]} current={kind} change={setKind} />
+    </div>
+    <p className="chart-note">{solar ? 'Annual sunlight' : 'Average wind at 100 m'} <strong>{metric.displayValue}</strong>
+    </p>
+    {!solar && report.ranking.extra_metrics?.wind_source_used === 'merra2' && (
+      <p className="chart-note">Wind estimate from MERRA-2 because Global Wind Atlas was unavailable.</p>
+    )}
+    {spec.preferred >= 0 ? <DashboardChart key={kind} spec={spec} /> : <p className="chart-placeholder">Monthly data unavailable.</p>}
+  </section>;
 }
 
-export default function Analysis({ site, onChooseSite, shortlist, onAdd, onRemove, onMapRadius }) {
-  const [tab, setTab] = useState(site.index === undefined ? 'area' : 'site');
-  const [radius, setRadius] = useState(100);
-  const [compareMode, setCompareMode] = useState('reference');
-  const added = shortlist.some(candidate => selectionKey(candidate) === selectionKey(site));
-  const mapRadius = tab === 'area' || (tab === 'compare' && compareMode.endsWith('area')) ? radius : 0;
-  useEffect(() => {
-    onMapRadius(mapRadius ? { radius: mapRadius, compare: tab === 'compare' } : null);
-    return () => onMapRadius(null);
-  }, [mapRadius, tab, onMapRadius]);
-  const [wind, setWind] = useState('gwa');
-  const [exact, setExact] = useState(false);
-  const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState(null);
-  const exactSite = useRef(null);
-  const panel = useRef(null);
-  useEffect(() => { if (panel.current) panel.current.scrollTop = 0; }, [site]);
+function Method({ analysis, report, legacy }) {
+  const { trend } = analysis;
+  const years = period => period?.length === 2 ? period[0].slice(0, 4) + '–' + period[1].slice(0, 4) : unknown;
 
+  return <Disclosure label="Method & statistics">
+    <p>The screening score weighs outdoor cooling climate, renewable resources, and modeled water indicators. A build decision also depends on grid capacity, fiber connectivity, land, and permits.</p>
+    <dl className="method-grid">
+      <div><dt>Historical record</dt><dd>{years(report.meta?.historical_period)}</dd></div>
+      <div><dt>Scenario period</dt><dd>{years(report.meta?.scenario_period)}</dd></div>
+      <div><dt>Historical slope</dt><dd>{slopeText(trend.slopePerDecade)}</dd></div>
+      <div><dt>95% slope interval</dt><dd>{trend.slope95CI ? trend.slope95CI.map(value => value.toFixed(2)).join(' to ') + ' °C per decade' : unknown}</dd></div>
+      <div><dt>Unadjusted test</dt><dd>{probabilityText(trend.pValue)}</dd></div>
+      <div><dt>FDR-adjusted test</dt><dd>{probabilityText(trend.pAdjusted)}</dd></div>
+      <div><dt>Trend result at 5%</dt><dd>{significanceText(trend.isSignificant)}{trend.significanceBasis && (trend.significanceBasis === 'fdr' ? ' · Adjusted across regions' : ' · Single-site test')}</dd></div>
+      <div><dt>Mapped water sample</dt><dd>{analysis.metrics[4].displayValue}</dd></div>
+    </dl>
+    <p>The mapped sample is a separate reference layer. The score uses modeled water proximity and flow. Neither distance establishes water access for a project.</p>
+    <table className="method-table">
+      <thead><tr><th scope="col">Factor</th><th scope="col">Score / 100</th><th scope="col">Weight</th><th scope="col">Points</th></tr></thead>
+      <tbody>{analysis.score.factors.map(factor => <tr key={factor.key}>
+        <th scope="row">{factor.label}</th><td>{valueText(factor.score)}</td><td>{percentText(factor.weight)}</td><td>{valueText(factor.contribution)}</td>
+      </tr>)}</tbody>
+    </table>
+    <a className="text-button" href={legacy}>Regional report &amp; CSV downloads <Icon name="upRight" /></a>
+  </Disclosure>;
+}
+
+export default function Analysis({ site, onChooseSite, shortlist, onAdd, onRemove }) {
+  const [tab, setTab] = useState('site');
+  const [timeRange, setTimeRange] = useState(DEFAULT_TIME_RANGE);
+  const [request, setRequest] = useState(null);
+  const [result, setResult] = useState(null);
+  const panel = useRef(null);
+  const exact = request?.site === site ? request.exact : site.index === undefined;
+  const attempt = request?.site === site ? request.attempt : 0;
+  const rangeKey = timeRangeKey(timeRange);
+  const customWindow = !isDefaultTimeRange(timeRange);
+  const added = shortlist.some(candidate => selectionKey(candidate) === selectionKey(site));
+
+  useEffect(() => { if (panel.current) panel.current.scrollTop = 0; }, [site, tab]);
+  useEffect(() => {
+    const node = panel.current;
+    const footer = node?.parentElement?.querySelector('.footer');
+    if (!footer) return;
+    function fitFooter() {
+      node.style.setProperty('--analysis-footer-height', footer.offsetHeight + 'px');
+    }
+    const observer = new ResizeObserver(fitFooter);
+    fitFooter();
+    observer.observe(footer);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     const controller = new AbortController();
     const { signal } = controller;
-    let local;
-    const useExact = exact && exactSite.current === site;
-    async function load() {
-      try {
-        local = await getSiteReport(site, wind, signal);
-        if (signal.aborted) return;
-        if (useExact) {
-          const exactReport = await getExactReport(site, wind, signal);
-          if (!signal.aborted) setResult({ site, wind, attempt, report: exactReport });
-        } else setResult({ site, wind, attempt, report: local });
-      } catch {
-        if (!signal.aborted) setResult({ site, wind, attempt, report: local, error: true });
-      }
-    }
-    void load();
+    getAnalysisReport(site, exact, signal, timeRange).then(
+      report => { if (!signal.aborted) setResult({ site, exact, attempt, rangeKey, report }); },
+      error => { if (!signal.aborted) setResult({ site, exact, attempt, rangeKey, error: error.message }); },
+    );
     return () => controller.abort();
-  }, [site, wind, exact, attempt]);
+  }, [site, exact, attempt, rangeKey, timeRange]);
 
-  const current = result?.site === site && result.wind === wind && result.attempt === attempt ? result : null;
+  const current = result?.site === site && result.exact === exact && result.attempt === attempt && result.rangeKey === rangeKey ? result : null;
   const report = current?.report;
-  const location = regionName(report?.region?.name) ?? site.region;
-  const period = report?.meta?.historical_period?.map(date => date.slice(0, 4)).join('–');
+  const analysis = useMemo(() => report ? normalizeAnalysis(report, site) : null, [report, site]);
   const legacy = '/legacy/index.html?' + new URLSearchParams({
-    lat: site.latitude, lon: site.longitude, wind,
+    lat: site.latitude, lon: site.longitude,
     ...(site.index === undefined ? {} : { marker: site.index }),
   });
+  const load = useExact => setRequest({ site, exact: useExact, attempt: attempt + 1 });
 
-  function requestExact() {
-    exactSite.current = site;
-    setExact(true);
-    setAttempt(value => value + 1);
-  }
+  return <section className="analysis-panel" aria-label="Site analysis" ref={panel}>
+    <header className="site-heading">
+      <p className="eyebrow"><span className="signal-dot" /> Data center site analysis</p>
+      <h1>{siteLabel(site)}</h1>
+      <p>{analysis?.region ?? site.region}, Finland</p>
+    </header>
 
-  return (
-    <section className="analysis-panel" aria-label="Site analysis" ref={panel}>
-      <header className="site-heading">
-        <p className="eyebrow"><span className="signal-dot" /> Data center site analysis</p>
-        <h1>{site.name ?? location}</h1>
-        <p>{site.name && site.name !== location ? location + ', Finland' : 'Finland'}</p>
-      </header>
+    <div className="analysis-navigation">
+      <div className="toggle" role="group" aria-label="Analysis view">
+        <button type="button" aria-pressed={tab === 'site'} onClick={() => setTab('site')}>Site</button>
+        <button type="button" aria-pressed={tab === 'compare'} onClick={() => setTab('compare')}>Compare ({shortlist.length})</button>
+      </div>
+      <button type="button" className="back-button add-site" disabled={added || shortlist.length >= 3}
+        title={!added && shortlist.length >= 3 ? 'Remove a comparison site before adding another' : undefined}
+        onClick={() => { onAdd({ ...site, exact, report }); setTab('compare'); }}>
+        <Icon name="plus" />{added ? 'Added to comparison' : 'Add to comparison'}
+      </button>
+    </div>
 
-      <div className="analysis-navigation">
-        <div className="toggle" role="group" aria-label="Analysis view">
-          <button aria-pressed={tab === 'site'} onClick={() => setTab('site')}>Site</button>
-          <button aria-pressed={tab === 'area'} onClick={() => setTab('area')}>Area</button>
-          <button aria-pressed={tab === 'compare'} onClick={() => setTab('compare')}>Compare ({shortlist.length})</button>
-        </div>
-        <button className="back-button add-site" disabled={added || shortlist.length >= 3}
-          title={!added && shortlist.length >= 3 ? 'Remove a comparison site before adding another' : undefined}
-          onClick={() => { onAdd(site); setTab('compare'); }}>
-          <Icon name="plus" />{added ? 'Added to comparison' : 'Add to comparison'}
+    <TimeWindowControls timeRange={timeRange} onChange={setTimeRange} />
+
+    {tab === 'compare' && <Comparison candidates={shortlist} remove={onRemove} leader={report?.leader} onChooseSite={onChooseSite} timeRange={timeRange} />}
+    {tab === 'site' && analysis && <>
+      <ScoreSummary analysis={analysis} report={report} customWindow={customWindow} />
+      <Disclosure label="Measurements and charts">
+        <Temperature report={report} analysis={analysis} />
+        <Energy report={report} analysis={analysis} />
+        <section className="detail-section">
+          <h3>Modeled water proximity</h3>
+          <p>{analysis.metrics[3].displayValue}</p>
+        </section>
+      </Disclosure>
+      <Method analysis={analysis} report={report} legacy={legacy} />
+    </>}
+    {tab === 'site' && !current && <p className="card" role="status">{exact || customWindow ? 'Analyzing selected coordinates…' : 'Loading regional sample…'}</p>}
+    {tab === 'site' && current?.error && <div className="card" role="status">
+      <p>{current.error}</p><button className="text-button" onClick={() => load(exact)}>Retry</button>
+    </div>}
+    {tab === 'site' && (site.index !== undefined || customWindow) && <div className="analysis-tools">
+      {customWindow && site.index !== undefined ? (
+        <button className="text-button" onClick={() => { setTimeRange(DEFAULT_TIME_RANGE); load(false); }}>
+          View default regional sample (2005–2024) <Icon name="right" />
         </button>
-      </div>
-
-      {tab === 'area' && <AreaAnalysis site={site} wind={wind} radius={radius} onRadius={setRadius} />}
-      {tab === 'compare' && <Comparison candidates={shortlist} remove={onRemove} wind={wind}
-        mode={compareMode} onMode={setCompareMode} radius={radius} onRadius={setRadius} />}
-
-      {tab === 'site' && report && <>
-        <div className="scope">
-          <p className="scope-title">{{ region: 'Regional reference', archive: 'Archived point data', point: 'Point analysis' }[report.mode]}</p>
-          {report.mode === 'region' && Number.isFinite(report.ranking.lat) && Number.isFinite(report.ranking.lon) &&
-            <p>Data from {coordinates(report.ranking.lat, report.ranking.lon)}</p>}
-          {period && <p className="scope-period">Climate record {period}</p>}
-        </div>
-        <Score report={report} onChooseSite={onChooseSite} />
-        <Measurements report={report} />
-        {Number.isFinite(report.hydro?.nearest_surface_sample_km) && (
-          <p className="decision-note">Near this data reference, the closest mapped water sample is a {report.hydro.nearest_surface_type} at {number(report.hydro.nearest_surface_sample_km, 'km')}. This layer is for context and does not affect the score.</p>
-        )}
-        <div className="chart-grid">
-          <Temperature report={report} />
-          <Seasonality report={report} />
-        </div>
-        <p className="decision-note">Use the score to shortlist sites. A build decision also depends on grid capacity, fiber connectivity, land and permits.</p>
-      </>}
-
-      {tab === 'site' && !current && <div className="card" role="status">{exact && exactSite.current === site ? 'Analyzing selected coordinates…' : 'Loading site statistics…'}</div>}
-      {tab === 'site' && current?.error && <div className="card" role="status">
-        <p>{report ? 'Point service unavailable. Showing the bundled data.' : 'Site statistics could not be loaded.'}</p>
-        <button className="text-button" onClick={() => setAttempt(value => value + 1)}>Retry</button>
-      </div>}
-
-      <div className="analysis-tools">
-        <label className="wind-picker">
-          <span>Wind dataset</span>
-          <select value={wind} onChange={event => setWind(event.target.value)}>
-            <option value="gwa">Global Wind Atlas</option>
-            <option value="merra2">NASA MERRA-2</option>
-          </select>
-        </label>
-        {tab === 'site' && <button className="text-button exact-button" onClick={requestExact} disabled={!current}>Analyze exact coordinates <Icon name="right" /></button>}
-        {tab === 'site' && <a className="text-button" href={legacy}>Regional report &amp; CSV downloads <Icon name="upRight" /></a>}
-      </div>
-    </section>
-  );
+      ) : site.index !== undefined && (
+        <button className="text-button" onClick={() => load(!exact)}>
+          {exact ? 'View regional sample' : 'Analyze exact coordinates'} <Icon name="right" />
+        </button>
+      )}
+    </div>}
+  </section>;
 }
