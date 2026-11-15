@@ -643,20 +643,82 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
   .factor-explanation { grid-column: 1 / -1; }
 }
 
-.time-controls { display: grid; gap: 8px; }
-.time-controls-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-.time-controls-label { color: var(--muted); font-size: 11px; min-width: 52px; }
-.time-selects { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; }
-.time-selects select {
+.data-period {
+  display: grid;
+  gap: 12px;
+  background: linear-gradient(120deg, #111e1a, var(--card) 65%);
+  border-color: #2b4039;
+}
+
+.data-period-header, .data-period-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.data-period-edit, .data-period-apply {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 11px;
+  border: 1px solid #3a5a4e;
+  border-radius: 7px;
+  background: #162923;
+  color: #dcf5ea;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.data-period-edit svg { width: 14px; height: 14px; }
+.data-period-edit:hover { background: #203b31; }
+.data-period-track { display: flex; gap: 4px; height: 5px; }
+.data-period-track span { flex-basis: 0; border-radius: 99px; }
+.data-period-track span:first-child { background: var(--mint); }
+.data-period-track span:last-child { background: repeating-linear-gradient(90deg, #9acbea 0 5px, #335364 5px 9px); }
+
+.data-period-summary, .data-period-fields, .data-period-custom {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+
+.data-period-segment { display: grid; align-content: start; gap: 3px; }
+.data-period-segment dt, .data-period-field > label { font-size: 12px; line-height: 1.35; font-weight: 600; }
+.data-period-history dt { color: var(--mint); }
+.data-period-projection dt { color: #add7f1; }
+.data-period-years { font-size: clamp(17px, 3.8cqi, 23px); font-variant-numeric: tabular-nums; line-height: 1.15; letter-spacing: -.025em; }
+.data-period-reading, .data-period-note, .data-period-field p { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.data-period-reading strong, .data-period-field p strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.data-period-form { display: grid; gap: 13px; border-top: 1px solid var(--line); padding-top: 12px; }
+.data-period-field { display: grid; align-content: start; gap: 6px; min-width: 0; }
+.data-period-custom { gap: 8px; }
+.data-period-custom label { display: grid; gap: 4px; min-width: 0; color: var(--muted); }
+.data-period-form select {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding-inline: 9px 4px;
+  border: 1px solid #385249;
+  border-radius: 7px;
   background: #0d1715;
-  border: 1px solid #314540;
-  border-radius: 5px;
-  min-height: 28px;
-  padding-inline: 6px 4px;
-  font-size: 11px;
+  color: var(--ink);
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
-.time-controls-span { margin-top: 0; margin-left: auto; }
+
+.data-period-reset { min-height: 36px; }
+.data-period-apply { min-height: 42px; padding-inline: 16px; color: #10211b; background: var(--mint); }
+.data-period-apply:hover:not(:disabled) { background: #c4f5df; }
+.data-period button:disabled { cursor: default; }
+
+@container (width < 380px) {
+  .data-period-fields { grid-template-columns: 1fr; gap: 13px; }
+}
 
 /* Approved city-lights opening, replacing the prerecorded flight. */
 .earth-opening { object-fit: initial; touch-action: none; background: transparent; }

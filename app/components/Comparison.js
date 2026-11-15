@@ -6,13 +6,14 @@ import { coordinates } from '../lib/format';
 import { deltaText, unknown, valueText } from '../lib/analysis-format';
 import { comparableScores, factorDefinitions, metricDefinitions, normalizeAnalysis, sourceLabel } from '../lib/site-analysis';
 import {
-  comparisonColors, DEFAULT_TIME_RANGE, getAnalysisReport, isDefaultTimeRange, selectionKey, siteLabel, timeRangeKey,
+  comparisonColors, DEFAULT_TIME_RANGE, getAnalysisReport, selectionKey, siteLabel, timeRangeKey,
 } from '../lib/sites';
 import DashboardChart from './DashboardChartLazy';
 import Disclosure from './Disclosure';
 
 const chartMetrics = [
-  { key: 'temp', label: 'Air temperature', unit: '°C', axis: 'Annual air temperature (°C)' },
+  { key: 'temp', label: 'Historical temperature', unit: '°C', axis: 'Annual air temperature (°C)', monthly: 'historical_monthly' },
+  { key: 'projection', label: 'Temperature projection', unit: '°C', axis: 'Annual air temperature (°C)', monthly: 'scenario_monthly' },
   { key: 'solar', label: 'Monthly sunlight', unit: 'kWh/m²', axis: 'Sunlight (kWh/m² per month)', field: 'solar_kwh_m2' },
   { key: 'wind', label: 'Wind at 100 m', unit: 'm/s', axis: 'Wind at 100 m (m/s)', field: 'wind_speed_100m_ms' },
 ];
@@ -43,13 +44,12 @@ function strongestInput(baseline, candidate, weights, factorIndex) {
   return largest;
 }
 
-function TrendPlot({ candidates, reports }) {
-  const [choice, setChoice] = useState('temp');
+function TrendPlot({ candidates, reports, choice, onChoice }) {
   const metric = chartMetrics.find(item => item.key === choice);
   const spec = useMemo(() => {
-    const isTemp = metric.key === 'temp';
+    const isTemp = !!metric.monthly;
     const rows = reports.map(report => isTemp
-      ? annualTemperatures(report?.chart.historical_monthly ?? [])
+      ? annualTemperatures(report?.chart[metric.monthly] ?? [])
       : report?.chart.monthly_climatology ?? []);
     const years = [...new Set(rows.flatMap(series => series.map(row => row.year)))].sort();
     const series = rows.map((data, i) => {
@@ -70,7 +70,7 @@ function TrendPlot({ candidates, reports }) {
     <div className="chart-heading">
       <h2>Compare trends</h2>
       <label className="chart-metric"><span className="sr-only">Chart metric</span>
-        <select value={choice} onChange={event => setChoice(event.target.value)}>
+        <select value={choice} onChange={event => onChoice(event.target.value)}>
           {chartMetrics.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
         </select>
       </label>
@@ -144,6 +144,7 @@ function RawMeasurements({ candidates, analyses, reports }) {
 export default function Comparison({ candidates, remove, leader, onChooseSite, timeRange = DEFAULT_TIME_RANGE }) {
   const [result, setResult] = useState(null);
   const [attempt, setAttempt] = useState(0);
+  const [chartChoice, setChartChoice] = useState('temp');
   const rangeKey = timeRangeKey(timeRange);
   const key = [attempt, rangeKey, ...candidates.map(site => selectionKey(site) + ':' + site.exact)].join(':');
   const count = candidates.length;
@@ -152,9 +153,8 @@ export default function Comparison({ candidates, remove, leader, onChooseSite, t
   useEffect(() => {
     if (count < 2) return;
     const controller = new AbortController();
-    const useCachedReport = isDefaultTimeRange(timeRange);
     Promise.allSettled(
-      candidates.map(site => (useCachedReport && site.report)
+      candidates.map(site => (site.report && site.reportRangeKey === rangeKey)
         ? site.report
         : getAnalysisReport(site, site.exact, controller.signal, timeRange)),
     )
@@ -166,7 +166,7 @@ export default function Comparison({ candidates, remove, leader, onChooseSite, t
         });
       });
     return () => controller.abort();
-  }, [candidates, count, key, timeRange]);
+  }, [candidates, count, key, rangeKey, timeRange]);
 
   const reports = current?.reports;
   const { analyses, differences, equal } = useMemo(() => {
@@ -190,7 +190,7 @@ export default function Comparison({ candidates, remove, leader, onChooseSite, t
 
   return <>
     <section className="card compare-controls">
-      <div className="chart-heading"><h2>Compare locations</h2><span className="scope-title">{count} / 3 · {timeRange.startYear}–{timeRange.endYear} (+{timeRange.horizonYears}y)</span></div>
+      <div className="chart-heading"><h2>Compare locations</h2><span className="scope-title">{count} of 3 sites</span></div>
       <p className="chart-note">Select locations on the map, then choose Add to comparison.</p>
       {leader && count < 3 && !candidates.some(site => site.siteId === leader.site_id) && (
         <button type="button" className="text-button compare-benchmark" onClick={() => onChooseSite(leader.site_id)}>
@@ -222,7 +222,7 @@ export default function Comparison({ candidates, remove, leader, onChooseSite, t
             : `${deltaText(gap, 'points')}${!equal && Math.abs(gap) < 2 ? ' · Essentially equal to A' : ''}`}</span>
         </li>)}</ul>
       </section>
-      <TrendPlot candidates={candidates} reports={reports} />
+      <TrendPlot candidates={candidates} reports={reports} choice={chartChoice} onChoice={setChartChoice} />
       <Difference candidates={candidates} analyses={analyses} reports={reports} differences={differences} />
       <RawMeasurements candidates={candidates} analyses={analyses} reports={reports} />
       {current.errors.some(Boolean) && <div className="card" role="status">
