@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a1411">
+  <title>Data &amp; sources — Earth to Finland</title>
+  <link rel="icon" href="assets/terra-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="data-package.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Site"><a href="/">← Finland map</a><a href="credits.html">Map credits</a></nav>
+    <header>
+      <h1>Data &amp; sources</h1>
+      <p>The screening results use the updated Finland datasets and the supplied three-part ranking model. The assembled Finland pipeline includes the datasets and the source used in this frontend.</p>
+      <div class="downloads">
+        <a href="downloads/finland-pipeline.zip" download>Assembled Finland pipeline</a>
+      </div>
+    </header>
+    <section aria-labelledby="current">
+      <h2 id="current">Current integration</h2>
+      <p>The current model weighs climate and cooling (25%), renewable energy (60%), and water resources (15%). The data come from NASA POWER, DTU Global Wind Atlas, Copernicus DEM, and GloFAS. The water indicators estimate nearby sources and streamflow.</p>
+      <p>Regional scores compare 19 reference sites. The map uses a region’s reference site when an exact point analysis is unavailable. The score supports site screening. A project decision also needs confirmation of grid capacity, water access, network connectivity, and permitting.</p>
+      <div class="downloads">
+        <a href="downloads/AGENT_FRONTEND_GUIDE.md" download>Frontend integration guide</a>
+        <a href="data/history/finland_all_regions_monthly.csv" download>Monthly data</a>
+        <a href="data/history/finland_all_regions_annual.csv" download>Annual data</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,81 @@
+{
+  "id": "fi_kainuu",
+  "name": "Kajaani",
+  "region": "Kainuu",
+  "coordinatesSource": "regional_reference",
+  "coordinates": {
+    "latitude": 64.23,
+    "longitude": 27.73
+  },
+  "score": {
+    "total": 48.06,
+    "rank": 9,
+    "ofTotal": 19,
+    "factors": [
+      {
+        "key": "climate",
+        "label": "Cooling conditions",
+        "score": 83.921,
+        "weight": 0.25,
+        "contribution": 20.98
+      },
+      {
+        "key": "renewables",
+        "label": "Wind and solar",
+        "score": 20.133,
+        "weight": 0.6,
+        "contribution": 12.08
+      },
+      {
+        "key": "water",
+        "label": "Water indicators",
+        "score": 100,
+        "weight": 0.15,
+        "contribution": 15
+      }
+    ]
+  },
+  "metrics": [
+    {
+      "key": "mean_air_temperature",
+      "value": 1.7145,
+      "unit": "°C",
+      "displayValue": "1.7 °C"
+    },
+    {
+      "key": "annual_solar",
+      "value": 852.12,
+      "unit": "kWh/m²/yr",
+      "displayValue": "852.1 kWh/m²/yr"
+    },
+    {
+      "key": "wind_100m",
+      "value": 6.19,
+      "unit": "m/s",
+      "displayValue": "6.2 m/s"
+    },
+    {
+      "key": "scoring_water_proximity",
+      "value": 0,
+      "unit": "km",
+      "displayValue": "Flagged at the modeled point"
+    },
+    {
+      "key": "mapped_water_sample",
+      "value": 1.167,
+      "unit": "km",
+      "displayValue": "1.2 km to a mapped river sample"
+    }
+  ],
+  "trend": {
+    "slopePerDecade": 0.44155,
+    "slope95CI": [
+      -0.0405,
+      0.9236
+    ],
+    "isSignificant": false,
+    "significanceBasis": "fdr",
+    "pValue": 0.0726053,
+    "pAdjusted": 0.1667586
+  }
+}
