@@ -13,7 +13,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
   const centerX = (west + east) / 2;
   const centerY = (north + south) / 2;
   let size, view, transition, zoomTarget, frame = 0, lastFrame, dirty = true, selected, hover, keyboard;
-  let borders = 0, isolation = 0, active = false;
+  let borders = 0, isolation = 0, active = false, revealing = false;
   let resolvePainted;
   const painted = new Promise(resolve => { resolvePainted = resolve; });
   let drag, pinch, gestureScale;
@@ -23,6 +23,11 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
   function flightView() {
     const videoWidth = size.width < 640 ? Math.max(size.width, 710) : size.width;
     const k = Math.min(videoWidth / IMAGE_WIDTH, size.height / IMAGE_HEIGHT);
+    return { x: (size.width - IMAGE_WIDTH * k) / 2, y: (size.height - IMAGE_HEIGHT * k) / 2, k };
+  }
+
+  function fullScreenView() {
+    const k = Math.max(size.width / IMAGE_WIDTH, size.height / IMAGE_HEIGHT) * 1.002;
     return { x: (size.width - IMAGE_WIDTH * k) / 2, y: (size.height - IMAGE_HEIGHT * k) / 2, k };
   }
 
@@ -56,7 +61,8 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     zoomTarget = undefined;
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(height * dpr);
-    if (!active || !previous) view = active ? fit() : flightView();
+    if (revealing) view = fullScreenView();
+    else if (!active || !previous) view = active ? fit() : flightView();
     else if (transition) {
       view = { ...view, x: view.x + (width - previous.width) / 2, y: view.y + (height - previous.height) / 2 };
       animate(fit(), transition.toBorders, transition.toIsolation, 520);
@@ -95,6 +101,22 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     if (!skip && transition) transition.start += handoffDelay;
   }
 
+  function prepareReveal() {
+    if (active || !size) return;
+    active = true;
+    revealing = true;
+    view = fullScreenView();
+    borders = 1;
+    isolation = 0;
+    schedule();
+  }
+
+  function finishReveal() {
+    if (!revealing) return;
+    revealing = false;
+    animate(fit(), 1, 0, 1120 / 1.5);
+  }
+
   function show(site) {
     if (site === selected || !active) return;
     const alreadyIsolated = !!selected && !!site;
@@ -115,11 +137,17 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     const right = x + IMAGE_WIDTH * k;
     const bottom = y + IMAGE_HEIGHT * k;
     const feather = Math.min(52 / k, IMAGE_HEIGHT / 4);
+    // Grow each feather from zero as its edge enters the viewport. Switching
+    // on a full-width feather at the boundary produces a visible dark flash.
+    const leftFade = Math.min(feather, Math.max(0, x / k));
+    const rightFade = Math.min(feather, Math.max(0, (width - right) / k));
+    const topFade = Math.min(feather, Math.max(0, y / k));
+    const bottomFade = Math.min(feather, Math.max(0, (height - bottom) / k));
     const edges = [
-      [x > 0, 0, 0, feather, 0, 0, 0, feather, IMAGE_HEIGHT],
-      [right < width, IMAGE_WIDTH, 0, IMAGE_WIDTH - feather, 0, IMAGE_WIDTH - feather, 0, feather, IMAGE_HEIGHT],
-      [y > 0, 0, 0, 0, feather, 0, 0, IMAGE_WIDTH, feather],
-      [bottom < height, 0, IMAGE_HEIGHT, 0, IMAGE_HEIGHT - feather, 0, IMAGE_HEIGHT - feather, IMAGE_WIDTH, feather],
+      [leftFade > 0, 0, 0, leftFade, 0, 0, 0, leftFade, IMAGE_HEIGHT],
+      [rightFade > 0, IMAGE_WIDTH, 0, IMAGE_WIDTH - rightFade, 0, IMAGE_WIDTH - rightFade, 0, rightFade, IMAGE_HEIGHT],
+      [topFade > 0, 0, 0, 0, topFade, 0, 0, IMAGE_WIDTH, topFade],
+      [bottomFade > 0, 0, IMAGE_HEIGHT, 0, IMAGE_HEIGHT - bottomFade, 0, IMAGE_HEIGHT - bottomFade, IMAGE_WIDTH, bottomFade],
     ];
     for (const [visible, x1, y1, x2, y2, ...rect] of edges) {
       if (!visible) continue;
@@ -531,7 +559,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     canvas.addEventListener(event, handler, event === 'wheel' || event.startsWith('gesture') ? { passive: false } : undefined);
   }
   return {
-    enter, show, zoom, setContext, whenPainted: () => painted,
+    enter, prepareReveal, finishReveal, show, zoom, setContext, whenPainted: () => painted,
     destroy() {
       observer.disconnect();
       cancelAnimationFrame(frame);

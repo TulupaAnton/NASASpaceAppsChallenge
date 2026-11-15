@@ -16,6 +16,13 @@ shading. Each shell clears gently as the camera crosses it. There is no separate
 procedural overlay and no fading out of the original clouds during approach.
 
 The interactive map loads and paints behind the scene during the opening.
+Its initial photo framing covers the entire viewport, including on resize,
+and remains fixed while clouds clear. Only after exit finishes does the map
+ease back to its usual fitted framing over approximately 0.75 seconds; the
+black feathered edges therefore enter after the cloud crossing, not during it.
+Each feather grows from zero width as its image edge enters the viewport,
+avoiding the previous full-width shadow switch. Header/footer shading fades
+in over the same 0.75-second settling interval instead of appearing instantly.
 At the cloud boundary, its first-paint promise must resolve before exit starts.
 During exit, the Earth surface fades beneath the existing clouds and the WebGL
 background becomes transparent. The clouds clear over the actual map canvas.

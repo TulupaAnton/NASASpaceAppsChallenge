@@ -60,7 +60,7 @@ export default function Experience() {
         if (current !== run.current || !canvas.current) return false;
         view.current?.destroy();
         view.current = createMapView(canvas.current, focusArea.current, assets, choosePoint, miss, () => motion.current?.matches);
-        view.current.enter(true);
+        view.current.prepareReveal();
         const painted = await view.current.whenPainted();
         return painted && current === run.current;
       } catch (error) {
@@ -74,6 +74,7 @@ export default function Experience() {
   const enterMap = useCallback(async (skip = false, cloudHandoff = false) => {
     if (skip) skipRequested.current = true;
     if (skip && phaseRef.current === 'cloud-exit') {
+      view.current?.finishReveal();
       phaseRef.current = 'map'; setPhase('map'); setOpeningMounted(false);
       return;
     }
@@ -88,6 +89,7 @@ export default function Experience() {
       if (cloudHandoff && !skipRequested.current) {
         phaseRef.current = 'cloud-exit'; setPhase('cloud-exit');
       } else {
+        view.current?.finishReveal();
         phaseRef.current = 'map'; setPhase('map'); setOpeningMounted(false);
       }
     } catch {
@@ -129,6 +131,7 @@ export default function Experience() {
   const prepareCloudMap = useCallback(() => { void enterMap(false, true); }, [enterMap]);
   const finishClouds = useCallback(() => {
     if (phaseRef.current !== 'cloud-exit') return;
+    view.current?.finishReveal();
     phaseRef.current = 'map'; setPhase('map'); setOpeningMounted(false);
   }, []);
   const layoutOpening = useCallback(progress => {

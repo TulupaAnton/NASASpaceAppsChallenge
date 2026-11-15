@@ -91,6 +91,13 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
   background: linear-gradient(transparent, #000c);
 }
 
+.experience[data-view="map"] .topbar,
+.experience[data-view="map"] .footer {
+  animation: map-chrome-in .75s ease both;
+}
+
+@keyframes map-chrome-in { from { opacity: 0; } to { opacity: 1; } }
+
 .experience[data-view="analysis"] .topbar,
 .experience[data-view="analysis"] .footer {
   background: #000;
@@ -657,4 +664,9 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
 .experience[data-view="flight"] .flight-controls { animation: opening-controls-in .267s .533s both; }
 @keyframes opening-controls-in { from { opacity: 0; visibility: hidden; } to { opacity: 1; visibility: visible; } }
 @media (max-width: 939px) { .earth-opening { width: 100%; left: 0; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .earth-opening, .experience[data-view="flight"] .flight-controls { transition: none; animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .earth-opening,
+  .experience[data-view="flight"] .flight-controls,
+  .experience[data-view="map"] .topbar,
+  .experience[data-view="map"] .footer { transition: none; animation: none; }
+}
