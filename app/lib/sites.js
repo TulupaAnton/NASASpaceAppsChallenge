@@ -1,25 +1,35 @@
-import { finlandRegionId } from '../../public/legacy/finland-data';
-import { CACHED_POINTS } from '../../public/legacy/point-api';
-import { project } from '../../public/legacy/projection';
-import { referenceSites } from '../../public/legacy/reference-sites';
+import { finlandRegionId } from '../../public/legacy/finland-data.js';
+import { CACHED_POINTS } from '../../public/legacy/point-api.js';
+import { referenceSites } from '../../public/legacy/reference-sites.js';
+import canadaReferences from '../../public/canada/sites.json' with { type: 'json' };
+import mongoliaReferences from '../../public/mongolia/sites.json' with { type: 'json' };
+import { canadaSiteId, countries, mongoliaSiteId } from './countries.js';
+import { coordinates } from './format.js';
 
-export const sites = [
+const finlandReferences = [
   ...referenceSites,
   { name: 'Inari', region: 'Lappi', point: [27.0288, 68.9050] },
   ...CACHED_POINTS.map(point => ({
     name: point.name, region: 'Satakunta', point: [point.longitude, point.latitude],
   })),
-].map((site, index) => ({
-  ...site, index, xy: project(...site.point), siteId: site.siteId ?? finlandRegionId(site.region),
-}));
+];
 
-export const siteOptions = [...sites].sort((a, b) => a.name.localeCompare(b.name));
+const canadaSites = canadaReferences.map(site => ({ ...site, major: true, siteId: canadaSiteId(site.code) }));
+const mongoliaSites = mongoliaReferences.map(site => ({ ...site, major: true, siteId: mongoliaSiteId(site.code) }));
+const finlandSites = finlandReferences.map(site => ({ ...site, siteId: site.siteId ?? finlandRegionId(site.region) }));
+export const countrySites = Object.fromEntries(Object.entries({ fi: finlandSites, ca: canadaSites, mn: mongoliaSites }).map(([id, references]) => [
+  id, references.map((site, index) => ({ ...site, index, xy: countries[id].project(...site.point) })),
+]));
+export const countrySiteOptions = Object.fromEntries(Object.entries(countrySites).map(([id, sites]) => [
+  id, [...sites].sort((a, b) => a.name.localeCompare(b.name)),
+]));
 
-export function selection(point, region, site) {
+export function selection(point, region, site, country = 'fi') {
   const [longitude, latitude] = point;
   return {
-    point, longitude, latitude, region, name: site?.name, index: site?.index,
-    siteId: site?.siteId ?? finlandRegionId(region), xy: site?.xy ?? project(...point),
+    point, longitude, latitude, region, country, name: site?.name, index: site?.index,
+    siteId: site?.siteId ?? countrySites[country].find(reference => reference.region === region)?.siteId,
+    xy: site?.xy ?? countries[country].project(...point),
   };
 }
 
@@ -38,11 +48,11 @@ async function readResponse(response) {
 }
 
 export function selectionKey(site) {
-  return `${site.latitude.toFixed(5)},${site.longitude.toFixed(5)}`;
+  return `${site.country ?? 'fi'}:${site.latitude.toFixed(5)},${site.longitude.toFixed(5)}`;
 }
 
 export function siteLabel(site) {
-  return site.name ?? `Point ${site.latitude.toFixed(2)}° N, ${site.longitude.toFixed(2)}° E`;
+  return site.name ?? `Point ${coordinates(site.latitude, site.longitude, 2)}`;
 }
 
 export const DEFAULT_TIME_RANGE = { startYear: 2005, endYear: 2024, horizonYears: 10 };
@@ -58,7 +68,7 @@ export function timeRangeKey(range = DEFAULT_TIME_RANGE) {
 }
 
 export async function getSiteReport(site, signal) {
-  const sample = CACHED_POINTS.find(point =>
+  const sample = (!site.country || site.country === 'fi') && CACHED_POINTS.find(point =>
     Math.abs(site.latitude - point.latitude) < .00005 && Math.abs(site.longitude - point.longitude) < .00005);
   return readResponse(await fetch(`/api/regions/${sample?.id ?? site.siteId}`, { signal }));
 }
@@ -69,6 +79,7 @@ export async function getExactReport(site, signal, timeRange = DEFAULT_TIME_RANG
     body: JSON.stringify({
       lat: site.latitude,
       lon: site.longitude,
+      country: site.country,
       startYear: timeRange.startYear,
       endYear: timeRange.endYear,
       horizonYears: timeRange.horizonYears,

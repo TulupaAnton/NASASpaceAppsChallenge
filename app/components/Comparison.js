@@ -94,11 +94,11 @@ function Difference({ candidates, analyses, reports, differences }) {
   const baseline = analyses[0];
   const spec = useMemo(() => differences.some(item => item.factors) ? ({
     type: 'bar', title: 'Weighted score changes compared with A', horizontal: true,
-    unit: 'points', axisLabel: 'Change from A (score points)', zero: true, labels: factorDefinitions.map(item => item.label),
+    unit: 'points', axisLabel: 'Change from A (score points)', zero: true, labels: baseline.score.factors.map(item => item.label),
     series: differences.filter(item => item.factors).map(({ index, factors }) => ({
       label: letters[index] + ' vs A', tone: comparisonColors[index], data: factors,
     })),
-  }) : null, [differences]);
+  }) : null, [baseline, differences]);
 
   return <section className="card">
     <h2>Differences from A</h2>

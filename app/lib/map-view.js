@@ -1,5 +1,5 @@
 import { IMAGE_HEIGHT, IMAGE_WIDTH, unproject } from '../../public/legacy/projection';
-import { comparisonColors, selection, sites } from './sites';
+import { comparisonColors, selection } from './sites';
 
 const amber = '#ffc477';
 const clamp = (x, min, max) => Math.min(max, Math.max(min, x));
@@ -10,7 +10,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
   const ctx = canvas.getContext('2d', { alpha: false });
   const imageWidth = assets.projection?.width ?? IMAGE_WIDTH;
   const imageHeight = assets.projection?.height ?? IMAGE_HEIGHT;
-  const mapSites = assets.sites ?? sites;
+  const mapSites = assets.sites ?? [];
   const [west, north, east, south] = assets.bounds;
   const centerX = (west + east) / 2;
   const centerY = (north + south) / 2;

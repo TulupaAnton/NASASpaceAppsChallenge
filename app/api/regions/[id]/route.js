@@ -7,5 +7,5 @@ export async function GET(_request, { params }) {
   const report = await regionReport(id);
   return report
     ? Response.json(report, { headers: { 'Cache-Control': 'public, max-age=300' } })
-    : Response.json({ error: 'Unknown Finland reference site.' }, { status: 404 });
+    : Response.json({ error: 'Unknown reference site.' }, { status: 404 });
 }

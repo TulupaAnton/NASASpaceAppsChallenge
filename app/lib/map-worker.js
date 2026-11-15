@@ -4,9 +4,10 @@ import { prepareMapArtwork } from './map-artwork.js';
 self.onmessage = async ({ data: code }) => {
   try {
     const config = getCountry(code);
-    const [imageResponse, geometryResponse] = await Promise.all([fetch(config.image), fetch(config.geometry)]);
+    const [imageResponse, geometryResponse] = await Promise.all([fetch(config.satellite), fetch(config.geometry)]);
     if (!imageResponse.ok || !geometryResponse.ok) throw new Error('Unable to load country map');
     const [image, geometry] = await Promise.all([createImageBitmap(await imageResponse.blob()), geometryResponse.json()]);
+    geometry.projection ??= config.projection;
     const artwork = prepareMapArtwork(image, geometry, () => new OffscreenCanvas(1, 1));
     const transfers = [image];
     async function pixels(layer) {
@@ -21,7 +22,7 @@ self.onmessage = async ({ data: code }) => {
     ]);
     const highlights = new Map();
     for (const name of artwork.regionNames) highlights.set(name, await pixels(artwork.highlight(name)));
-    self.postMessage({ image, geometry, bounds: artwork.bounds, cutout, borders, zoomBorders, highlights }, transfers);
+    self.postMessage({ country: config.id, image, geometry, bounds: artwork.bounds, cutout, borders, zoomBorders, highlights }, transfers);
   } catch (error) {
     self.postMessage({ error: error.message });
   }

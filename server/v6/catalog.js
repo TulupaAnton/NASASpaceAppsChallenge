@@ -4,6 +4,8 @@ import gwa from '../../public/legacy/data/gwa.json' with { type: 'json' };
 import metadata from '../../public/legacy/data/metadata.json' with { type: 'json' };
 import hydro from './data/hydro/region-proximity.json' with { type: 'json' };
 import special from './data/hydro/special-proximity.json' with { type: 'json' };
+import { canadaRegionReport } from './canada.js';
+import { mongoliaRegionReport } from './mongolia.js';
 
 const { regions } = metadata;
 const files = new Map();
@@ -21,6 +23,8 @@ async function readDataset(file) {
 }
 
 export async function regionReport(id) {
+  if (id.startsWith('ca_')) return canadaRegionReport(id);
+  if (id.startsWith('mn_')) return mongoliaRegionReport(id);
   if (id === 'rauma') {
     const raw = await readDataset('cached-points/rauma-gwa.json');
     return {

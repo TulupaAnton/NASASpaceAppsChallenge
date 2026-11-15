@@ -130,6 +130,27 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
 .toplinks a, .credits { color: var(--muted); font-size: 12px; }
 .toplinks a svg, .back-button svg, .text-button svg { width: 15px; height: 15px; }
 .toplinks a:hover, .credits:hover, .text-button:hover { color: var(--mint); }
+.map-country-picker {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid #314540;
+  border-radius: 8px;
+  background: #101918e0;
+}
+.map-country-picker button {
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  padding: 7px 11px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  transition: background .2s, color .2s;
+}
+.map-country-picker button:hover { color: #f1fff8; }
+.map-country-picker button[aria-pressed="true"] { background: #26453a; color: #e3f8ee; }
+.map-country-picker button[aria-disabled="true"] { cursor: wait; }
 .back-button, .site-picker, .icon-button {
   border: 1px solid #314540;
   border-radius: 7px;
@@ -148,6 +169,19 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
 .map { touch-action: none; opacity: 0; pointer-events: none; }
 .map:focus-visible { outline-offset: -4px; z-index: 1; }
 .map[aria-hidden="false"] { opacity: 1; pointer-events: auto; }
+.experience[data-switching="true"] .map { pointer-events: none; }
+.map-outgoing, .map-switch-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.map-switch-atmosphere {
+  opacity: 0;
+  background: radial-gradient(ellipse at 45% 42%, #c5e3e34d, #507d8626 44%, transparent 72%);
+}
 .experience[data-view="flight"] .map { pointer-events: none; }
 .cloud-transition { position: absolute; z-index: 2; inset: 0; pointer-events: none; }
 .cloud-transition canvas { display: block; width: 100%; height: 100%; }
@@ -513,10 +547,13 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
   .brand svg { width: 21px; height: 21px; }
   .toplinks { gap: 8px; }
   .toplinks a, .back-button { font-size: 11px; }
+  .map-country-picker button { padding-inline: 8px; font-size: 11px; }
   .toplinks a svg { display: none; }
   .back-button { padding-inline: 8px; gap: 4px; }
   .zoom button { width: 36px; height: 35px; }
   .site-picker { width: min(221px, 70%); }
+  .toplinks .sources-link span { display: none; }
+  .toplinks .sources-link svg { display: block; }
   .experience[data-view="analysis"] .toplinks > a { display: none; }
 }
 

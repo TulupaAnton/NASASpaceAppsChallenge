@@ -1,8 +1,8 @@
 import { loadFinlandGeometry } from '../../public/legacy/finland-geometry';
 import { collectRegions, findRegion } from '../../public/legacy/projection';
-import { getCountry, canadaSelection } from './countries.js';
+import { getCountry } from './countries.js';
 import { createMapProjection } from './map-projections.js';
-import { sites as finlandSites, selection } from './sites';
+import { countrySites, selection } from './sites';
 import { prepareMapArtwork } from './map-artwork.js';
 
 const pending = new Map();
@@ -33,11 +33,11 @@ function regionLookup(regionData) {
 function mapAssets(image, geometry, config, artwork) {
   const projection = createMapProjection(geometry.projection);
   const { project } = projection;
-  const sites = (config.sites ?? finlandSites).map(site => ({ ...site, xy: project(...site.point) }));
-  const select = config.code === 'CA' ? (point, region, site) => ({ ...canadaSelection(point, region, site), xy: project(...point) })
-    : (...args) => ({ ...selection(...args), countryCode: 'FI', countryName: 'Finland' });
+  const sites = countrySites[config.id].map(site => ({ ...site, xy: project(...site.point) }));
+  const select = (point, region, site) => ({ ...selection(point, region, site, config.id), xy: project(...point),
+    countryCode: config.id.toUpperCase(), countryName: config.name, regionName: region });
   return { image, ...artwork, projection, sites, select,
-    countryCode: config.code, regionAt: regionLookup(geometry.regionData) };
+    country: config.id, countryCode: config.id.toUpperCase(), regionAt: regionLookup(geometry.regionData) };
 }
 
 function loadWorkerMap(countryCode) {
@@ -63,19 +63,20 @@ function loadWorkerMap(countryCode) {
 function loadCanvasMap(countryCode) {
   const country = getCountry(countryCode);
   const image = new Image();
-  image.src = country.image;
-  const geometry = countryCode === 'FI' ? loadFinlandGeometry(country.geometry)
+  image.src = country.satellite;
+  const geometry = countryCode === 'fi' ? loadFinlandGeometry(country.geometry)
     : fetch(country.geometry).then(response => {
       if (!response.ok) throw new Error('Unable to load country boundaries');
-      return response.json();
+      return response.json().then(data => ({ ...data, projection: data.projection ?? country.projection }));
     });
   return Promise.all([image.decode(), geometry])
     .then(([, geometry]) => mapAssets(image, geometry, country, prepareMapArtwork(image, geometry)));
 }
 
-export function loadMap(countryCode = 'FI') {
+export function loadMap(countryCode = 'fi') {
+  countryCode = getCountry(countryCode).id;
   if (!pending.has(countryCode)) {
-    const background = countryCode === 'CA' && typeof Worker !== 'undefined' && typeof OffscreenCanvas !== 'undefined';
+    const background = countryCode !== 'fi' && typeof Worker !== 'undefined' && typeof OffscreenCanvas !== 'undefined';
     pending.set(countryCode, (background ? loadWorkerMap(countryCode).catch(() => loadCanvasMap(countryCode)) : loadCanvasMap(countryCode))
       .catch(error => {
         pending.delete(countryCode);

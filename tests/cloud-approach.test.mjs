@@ -45,9 +45,9 @@ test('approach stops over the intended existing northern Finland cloud texel and
 });
 
 test('Canada approach reaches its own existing cloud texel with continuous movement and unchanged cloud rotation', () => {
-  const f = fixture(), target = getCountry('CA').flightTarget;
+  const f = fixture(), target = getCountry('ca').approachTarget;
   const originalRotation = f.clouds.quaternion.clone();
-  const flight = createCloudApproach({ camera: f.camera, clouds: f.clouds, target, reducedMotion: () => false, onComplete() {} });
+  const flight = createCloudApproach({ camera: f.camera, clouds: f.clouds, targetLocation: target, reducedMotion: () => false, onComplete() {} });
   let previous = f.camera.position.clone();
   flight.tick(0);
   for (let i = 0; i <= 600; i++) {

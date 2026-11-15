@@ -4,12 +4,12 @@ A React and Next.js app for screening potential data center locations in Finland
 
 ## Run on localhost
 
-The country picker now includes **Canada** alongside Finland. Canada has its own
-cloud approach, projected NASA satellite map, all 13 provincial/territorial
-boundaries and geographic city markers. Selecting a Canadian location highlights
-the region and displays coordinates. The Canadian analysis panel is a separate
-integration; its handoff contract and asset provenance are in
-[docs/canada-map.md](docs/canada-map.md). Finland's existing analysis remains available.
+The country picker includes **Finland, Canada and Mongolia**. Each country has a
+satellite map, regional reference locations, bundled climate/energy/water reports
+and exact-coordinate analysis. The updated analysis panel and country switcher
+are merged from `origin/datax-earth-clouds-analysis` through `332d71c`.
+The local background map preparation and first-paint-before-departure handshake
+are retained. See [docs/canada-map.md](docs/canada-map.md) for the integration map.
 
 Install Node.js 20.9 or newer, extract the ZIP, and open a terminal in the extracted `finland-data-center-siting` directory (the one containing `package.json`).
 

@@ -112,7 +112,7 @@ async function fetchJsonWithTimeout(url, init = {}, timeoutMs = FETCH_TIMEOUT_MS
         }
     }
 }
-async function fetchNasaPowerMonthly(lat, lon, signal) {
+export async function fetchNasaPowerMonthly(lat, lon, signal, startYear = 1984, endYear = 2024) {
     const paramsList = [
         'T2M',
         'T2M_MAX_AVG',
@@ -124,7 +124,7 @@ async function fetchNasaPowerMonthly(lat, lon, signal) {
         'WS10M',
         'WS50M'
     ].join(',');
-    const url = `https://power.larc.nasa.gov/api/temporal/monthly/point` + `?parameters=${paramsList}&community=RE` + `&longitude=${lon.toFixed(4)}&latitude=${lat.toFixed(4)}` + `&start=1984&end=2024&format=JSON`;
+    const url = `https://power.larc.nasa.gov/api/temporal/monthly/point` + `?parameters=${paramsList}&community=RE` + `&longitude=${lon.toFixed(4)}&latitude=${lat.toFixed(4)}` + `&start=${startYear}&end=${endYear}&format=JSON`;
     const raw = await fetchJsonWithTimeout(url, {
         signal
     });
@@ -132,7 +132,7 @@ async function fetchNasaPowerMonthly(lat, lon, signal) {
     if (!parameter || !parameter.T2M) {
         throw new Error('NASA POWER Monthly API returned empty parameter payload.');
     }
-    return parameter;
+    return { parameters: parameter, elevationM: raw.geometry?.coordinates?.[2] };
 }
 function extractGwaPercentile(areaMeans, targetPerc) {
     if (!Array.isArray(areaMeans) || areaMeans.length === 0) return undefined;
@@ -403,7 +403,7 @@ async function fetchGlofasDischargeBatch(coords, signal) {
         return vals.reduce((a, b)=>a + b, 0) / vals.length;
     });
 }
-async function fetchWaterPrecision(lat, lon, signal) {
+export async function fetchWaterPrecision(lat, lon, signal) {
     const ringsKm = [
         0.5,
         1.5,
@@ -598,7 +598,7 @@ export async function analyzeExactPoint({ lat, lon, startYear = 2005, endYear = 
     let rawInputs = nasaCoarseCache.get(coordKey);
     if (!rawInputs) {
         const [params, gwaRes, terrain, water, hydroIndex] = await Promise.all([
-            fetchNasaPowerMonthly(lat, lon, signal),
+            fetchNasaPowerMonthly(lat, lon, signal).then(data => data.parameters),
             fetchGwa100mWithRetry(lat, lon, signal),
             fetchTerrainStencil(lat, lon, signal),
             fetchWaterPrecision(lat, lon, signal),
@@ -610,6 +610,14 @@ export async function analyzeExactPoint({ lat, lon, startYear = 2005, endYear = 
     }
     const { params, gwaRes, terrain, water, hydroIndex } = rawInputs;
     const pointHydro = hydroIndex ? queryFinlandHydroProximity(hydroIndex, lat, lon) : null;
+    const response = buildPointReport({ lat, lon, startYear, endYear, horizonYears, params, gwaRes, terrain, water, pointHydro });
+    pruneMap(pointCache, MAX_CACHE_ENTRIES);
+    pointCache.set(cacheKey, response);
+    return response;
+}
+
+export function buildPointReport({ lat, lon, startYear = 2005, endYear = 2024, horizonYears = 10,
+    params, gwaRes = null, terrain, water, pointHydro = null, requireComplete = false }) {
     const t2mRows = getParamSeries(params, 'T2M', startYear, endYear);
     const t2mMaxAvgRows = getParamSeries(params, 'T2M_MAX_AVG', startYear, endYear);
     const solarRows = getParamSeries(params, 'ALLSKY_SFC_SW_DWN', startYear, endYear);
@@ -619,6 +627,10 @@ export async function analyzeExactPoint({ lat, lon, startYear = 2005, endYear = 
     const precipRows = getParamSeries(params, 'PRECTOTCORR', startYear, endYear);
     const ws10Rows = getParamSeries(params, 'WS10M', startYear, endYear);
     const ws50Rows = getParamSeries(params, 'WS50M', startYear, endYear);
+    const expected = (endYear - startYear + 1) * 12;
+    if (requireComplete && [t2mRows, t2mMaxAvgRows, solarRows, ws10Rows, ws50Rows].some(rows => rows.length !== expected)) {
+        throw new Error('NASA POWER did not provide complete climate, solar and wind history.');
+    }
     if (t2mRows.length < 24) {
         throw new Error('Insufficient NASA POWER temperature history at this coordinate.');
     }
@@ -1042,7 +1054,7 @@ export async function analyzeExactPoint({ lat, lon, startYear = 2005, endYear = 
         scoring_mode: 'fixed',
         score_type: 'Fixed-anchor climate/resource screening score (heuristic), NOT construction viability'
     };
-    const response = {
+    return {
         point_hydro: pointHydro,
         partial: !hasWater,
         point_ranking: pointRanking,
@@ -1056,7 +1068,4 @@ export async function analyzeExactPoint({ lat, lon, startYear = 2005, endYear = 
         meta,
         total_ranked: 1
     };
-    pruneMap(pointCache, MAX_CACHE_ENTRIES);
-    pointCache.set(cacheKey, response);
-    return response;
 }

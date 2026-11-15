@@ -1,0 +1,15 @@
+[
+  {"code":"BC","region":"British Columbia","name":"Prince George","point":[-122.7497,53.9171]},
+  {"code":"AB","region":"Alberta","name":"Edmonton","point":[-113.4909,53.5461]},
+  {"code":"SK","region":"Saskatchewan","name":"Saskatoon","point":[-106.6700,52.1332]},
+  {"code":"MB","region":"Manitoba","name":"Winnipeg","point":[-97.1384,49.8951]},
+  {"code":"ON","region":"Ontario","name":"Toronto","point":[-79.3832,43.6532]},
+  {"code":"QC","region":"Quebec","name":"Québec City","point":[-71.2500,46.8200]},
+  {"code":"NB","region":"New Brunswick","name":"Fredericton","point":[-66.6431,45.9636]},
+  {"code":"NS","region":"Nova Scotia","name":"Halifax","point":[-63.5752,44.6700]},
+  {"code":"PE","region":"Prince Edward Island","name":"Charlottetown","point":[-63.1300,46.2550]},
+  {"code":"NL","region":"Newfoundland and Labrador","name":"St. John's","point":[-52.7126,47.5615]},
+  {"code":"YT","region":"Yukon","name":"Whitehorse","point":[-135.0568,60.7212]},
+  {"code":"NT","region":"Northwest Territories","name":"Yellowknife","point":[-114.3970,62.4540]},
+  {"code":"NU","region":"Nunavut","name":"Iqaluit","point":[-68.5170,63.7467]}
+]

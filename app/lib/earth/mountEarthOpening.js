@@ -4,7 +4,6 @@ import { createEarthControls } from './createEarthControls.js';
 import { createCloudApproach, createCloudDeparture } from './cloudApproach.js';
 import { createCloudDepth } from './cloudDepth.js';
 import { atmosphereFragment, earthFragment, globeVertex } from './shaders.js';
-import { getCountry } from '../countries.js';
 
 function seededRandom(seed) {
   return () => {
@@ -36,7 +35,7 @@ function createStars() {
   return new THREE.Points(geometry, material);
 }
 
-// The approved scene is isolated from Finland's map and calculation engine.
+// The opening scene hands off to the map after its cloud approach.
 export function mountEarthOpening(container, { onComplete, onReady, onError, onDepart, onChooseReady, onLayout, onApproachExit, approachOnly = false }) {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let disposed = false, intro, flight, lastTime, cloudDepth, approachArrived = false, approachExiting = false, introComplete = false, departureRequested = false;
@@ -100,7 +99,7 @@ export function mountEarthOpening(container, { onComplete, onReady, onError, onD
   scene.add(stars);
   let departureProgress = 0, placementProgress = 0, placementElapsed = 0;
   let placementReady = false, choiceAnnounced = false;
-  let departureTarget;
+  let approachTarget;
   function frameCountrySelection() {
     const width = container.clientWidth, height = container.clientHeight;
     if (!width || !height) return;
@@ -132,13 +131,13 @@ export function mountEarthOpening(container, { onComplete, onReady, onError, onD
       if (departureRequested) startFlight();
     }
   }
-  function startFlight(countryCode) {
-    if (countryCode) departureTarget = getCountry(countryCode).flightTarget;
+  function startFlight(target = approachTarget) {
     departureRequested = true;
+    approachTarget = target;
     if (disposed || !placementReady || flight) return;
     controls.enabled = false;
     onDepart();
-    flight = createCloudApproach({ camera, clouds, target: departureTarget,
+    flight = createCloudApproach({ camera, clouds, targetLocation: approachTarget,
       reducedMotion: () => reducedMotion.matches,
       onProgress: (progress, gap) => {
         departureProgress = progress;

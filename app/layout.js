@@ -2,7 +2,7 @@ import './globals.css';
 
 export const metadata = {
   title: 'DataX',
-  description: 'Fly to Finland and explore NASA climate data for data center siting.',
+  description: 'Explore satellite maps and NASA climate data for data center siting in Finland and Canada.',
   icons: { icon: '/legacy/assets/terra-icon.svg' },
 };
 

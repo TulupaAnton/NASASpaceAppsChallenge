@@ -3,5 +3,6 @@ export const number = (value, unit = '') => Number.isFinite(value)
   ? `${formatter.format(value)}${unit ? ` ${unit}` : ''}`
   : '—';
 
-export const coordinates = (lat, lon) => `${lat.toFixed(3)}° N  /  ${lon.toFixed(3)}° E`;
+export const coordinates = (lat, lon, digits = 3) =>
+  `${Math.abs(lat).toFixed(digits)}° ${lat < 0 ? 'S' : 'N'}  /  ${Math.abs(lon).toFixed(digits)}° ${lon < 0 ? 'W' : 'E'}`;
 export const regionName = name => name?.split(' (')[0];
