@@ -8,10 +8,13 @@ const smooth = t => t * t * (3 - 2 * t);
 
 export function createMapView(canvas, focusArea, assets, onPick, onMiss, reducedMotion) {
   const ctx = canvas.getContext('2d', { alpha: false });
+  const imageWidth = assets.projection?.width ?? IMAGE_WIDTH;
+  const imageHeight = assets.projection?.height ?? IMAGE_HEIGHT;
+  const mapSites = assets.sites ?? sites;
   const [west, north, east, south] = assets.bounds;
   const centerX = (west + east) / 2;
   const centerY = (north + south) / 2;
-  let size, view, transition, zoomTarget, frame = 0, lastFrame, dirty = true, selected, hover, keyboard;
+  let size, view, transition, zoomTarget, frame = 0, lastFrame, dirty = true, selected, picked, hover, keyboard;
   let borders = 0, isolation = 0, active = false, revealing = false;
   let resolvePainted;
   const painted = new Promise(resolve => { resolvePainted = resolve; });
@@ -21,13 +24,13 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
 
   function flightView() {
     const videoWidth = size.width < 640 ? Math.max(size.width, 710) : size.width;
-    const k = Math.min(videoWidth / IMAGE_WIDTH, size.height / IMAGE_HEIGHT);
-    return { x: (size.width - IMAGE_WIDTH * k) / 2, y: (size.height - IMAGE_HEIGHT * k) / 2, k };
+    const k = Math.min(videoWidth / imageWidth, size.height / imageHeight);
+    return { x: (size.width - imageWidth * k) / 2, y: (size.height - imageHeight * k) / 2, k };
   }
 
   function fullScreenView() {
-    const k = Math.max(size.width / IMAGE_WIDTH, size.height / IMAGE_HEIGHT) * 1.002;
-    return { x: (size.width - IMAGE_WIDTH * k) / 2, y: (size.height - IMAGE_HEIGHT * k) / 2, k };
+    const k = Math.max(size.width / imageWidth, size.height / imageHeight) * 1.002;
+    return { x: (size.width - imageWidth * k) / 2, y: (size.height - imageHeight * k) / 2, k };
   }
 
   function viewport() {
@@ -130,15 +133,20 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     else animate(fit(), 1, site ? 1 : 0, 880);
   }
 
+  function mark(site) {
+    picked = site;
+    schedule();
+  }
+
   function screen([x, y]) {
     return [view.x + x * view.k, view.y + y * view.k];
   }
 
   function fadePhotoEdges(width, height) {
     const { x, y, k } = view;
-    const right = x + IMAGE_WIDTH * k;
-    const bottom = y + IMAGE_HEIGHT * k;
-    const feather = Math.min(52 / k, IMAGE_HEIGHT / 4);
+    const right = x + imageWidth * k;
+    const bottom = y + imageHeight * k;
+    const feather = Math.min(52 / k, imageHeight / 4);
     // Grow each feather from zero as its edge enters the viewport. Switching
     // on a full-width feather at the boundary produces a visible dark flash.
     const leftFade = Math.min(feather, Math.max(0, x / k));
@@ -146,10 +154,10 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     const topFade = Math.min(feather, Math.max(0, y / k));
     const bottomFade = Math.min(feather, Math.max(0, (height - bottom) / k));
     const edges = [
-      [leftFade > 0, 0, 0, leftFade, 0, 0, 0, leftFade, IMAGE_HEIGHT],
-      [rightFade > 0, IMAGE_WIDTH, 0, IMAGE_WIDTH - rightFade, 0, IMAGE_WIDTH - rightFade, 0, rightFade, IMAGE_HEIGHT],
-      [topFade > 0, 0, 0, 0, topFade, 0, 0, IMAGE_WIDTH, topFade],
-      [bottomFade > 0, 0, IMAGE_HEIGHT, 0, IMAGE_HEIGHT - bottomFade, 0, IMAGE_HEIGHT - bottomFade, IMAGE_WIDTH, bottomFade],
+      [leftFade > 0, 0, 0, leftFade, 0, 0, 0, leftFade, imageHeight],
+      [rightFade > 0, imageWidth, 0, imageWidth - rightFade, 0, imageWidth - rightFade, 0, rightFade, imageHeight],
+      [topFade > 0, 0, 0, 0, topFade, 0, 0, imageWidth, topFade],
+      [bottomFade > 0, 0, imageHeight, 0, imageHeight - bottomFade, 0, imageHeight - bottomFade, imageWidth, bottomFade],
     ];
     for (const [visible, x1, y1, x2, y2, ...rect] of edges) {
       if (!visible) continue;
@@ -174,10 +182,10 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
 
     if (isolation < 1) {
       ctx.globalAlpha = 1 - isolation;
-      ctx.drawImage(assets.image, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
+      ctx.drawImage(assets.image, 0, 0, imageWidth, imageHeight);
       ctx.globalAlpha = borders * (1 - isolation);
       ctx.fillStyle = 'rgba(1, 12, 13, .29)';
-      ctx.fillRect(0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
+      ctx.fillRect(0, 0, imageWidth, imageHeight);
       fadePhotoEdges(width, height);
     }
 
@@ -196,7 +204,8 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
         ctx.globalAlpha = borders * mix;
         drawLayer(assets.zoomBorders);
       }
-      const highlight = selected && assets.highlight(selected.region);
+      const highlighted = selected ?? picked;
+      const highlight = highlighted && assets.highlight(highlighted.region);
       if (highlight) {
         ctx.globalAlpha = borders;
         drawLayer(highlight);
@@ -233,7 +242,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     const drawLabels = !selected && width >= 640;
     const showAllLabels = drawLabels && view.k >= fit().k * 1.4;
     const labels = [];
-    for (const site of sites) {
+    for (const site of mapSites) {
       if (selected?.index === site.index) continue;
       const [x, y] = screen(site.xy);
       if (x < 0 || y < 0 || x > width || y > height) continue;
@@ -254,8 +263,9 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
       ctx.strokeText(site.name, x + 7, y);
       ctx.fillText(site.name, x + 7, y);
     }
-    if (selected) {
-      const [x, y] = screen(selected.xy);
+    const pin = selected ?? picked;
+    if (pin) {
+      const [x, y] = screen(pin.xy);
       ctx.beginPath();
       ctx.arc(x, y, 10, 0, Math.PI * 2);
       ctx.fillStyle = '#ffbd6842';
@@ -338,7 +348,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
       if (x < map.left || x > map.left + map.width || y < map.top || y > map.top + map.height) return null;
     }
     let nearest, distance = tolerance;
-    for (const site of sites) {
+    for (const site of mapSites) {
       const [px, py] = screen(site.xy);
       const gap = Math.hypot(x - px, y - py);
       if (gap < distance) {
@@ -350,14 +360,14 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     const mapX = (x - view.x) / view.k;
     const mapY = (y - view.y) / view.k;
     if (mapX < west || mapX > east || mapY < north || mapY > south) return null;
-    const point = unproject(mapX, mapY);
+    const point = (assets.projection?.unproject ?? unproject)(mapX, mapY);
     const region = point && assets.regionAt(...point);
     return region ? { point, region } : null;
   }
 
   function pick(position, tolerance = 8) {
     const result = locate(position, tolerance);
-    if (result) onPick(selection(result.point, result.region, result.site));
+    if (result) onPick((assets.select ?? selection)(result.point, result.region, result.site));
     else onMiss();
   }
 
@@ -518,7 +528,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     const movement = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
     if (movement || event.key === 'Enter' || event.key === ' ') {
       const { left, top, width, height } = viewport();
-      keyboard ??= screen(selected?.xy ?? sites[0].xy);
+      keyboard ??= screen(selected?.xy ?? mapSites[0].xy);
       if (movement) {
         const step = event.shiftKey ? 25 : 8;
         keyboard = [
@@ -552,7 +562,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
     canvas.addEventListener(event, handler, event === 'wheel' || event.startsWith('gesture') ? { passive: false } : undefined);
   }
   return {
-    enter, prepareReveal, finishReveal, show, zoom, setContext, whenPainted: () => painted,
+    enter, prepareReveal, finishReveal, show, mark, zoom, setContext, whenPainted: () => painted,
     destroy() {
       observer.disconnect();
       cancelAnimationFrame(frame);

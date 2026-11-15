@@ -4,6 +4,13 @@ A React and Next.js app for screening potential data center locations in Finland
 
 ## Run on localhost
 
+The country picker now includes **Canada** alongside Finland. Canada has its own
+cloud approach, projected NASA satellite map, all 13 provincial/territorial
+boundaries and geographic city markers. Selecting a Canadian location highlights
+the region and displays coordinates. The Canadian analysis panel is a separate
+integration; its handoff contract and asset provenance are in
+[docs/canada-map.md](docs/canada-map.md). Finland's existing analysis remains available.
+
 Install Node.js 20.9 or newer, extract the ZIP, and open a terminal in the extracted `finland-data-center-siting` directory (the one containing `package.json`).
 
 ```sh

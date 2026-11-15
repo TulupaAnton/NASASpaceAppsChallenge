@@ -1,0 +1,31 @@
+{
+  "imagery": {
+    "title": "NASA Blue Marble Next Generation, July 2004",
+    "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-base/july/world.200407.3x21600x10800.jpg",
+    "credit": "NASA Earth Observatory; Reto St\u00f6ckli and Robert Simmon",
+    "sha256": "dea8b4dc8a4f93f5f8bce0c8c85a508a178e7901e9ed8e6bf86e6ce7ef6d61e2"
+  },
+  "boundaries": {
+    "title": "Statistics Canada, 2021 Census cartographic boundaries",
+    "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/0/query?f=geojson&where=1%3D1&outFields=PRUID%2CPRNAME%2CPRENAME&outSR=4326&returnGeometry=true&maxAllowableOffset=0.005&geometryPrecision=5",
+    "licence": "Open Government Licence \u2013 Canada",
+    "simplification": "0.008 degrees; islands under 2 square km omitted for display"
+  },
+  "projection": {
+    "type": "lambert-conformal-conic",
+    "width": 1600,
+    "height": 1000,
+    "parallels": [
+      49,
+      77
+    ],
+    "latitude": 63,
+    "longitude": -96,
+    "scale": 1208.7040168897092,
+    "translate": [
+      725.601796618759,
+      507.02702814847396
+    ]
+  },
+  "purpose": "Illustrative satellite map and geographic selection; no Canadian analysis datasets included"
+}

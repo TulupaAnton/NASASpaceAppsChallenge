@@ -4,6 +4,7 @@ import { createEarthControls } from './createEarthControls.js';
 import { createCloudApproach, createCloudDeparture } from './cloudApproach.js';
 import { createCloudDepth } from './cloudDepth.js';
 import { atmosphereFragment, earthFragment, globeVertex } from './shaders.js';
+import { getCountry } from '../countries.js';
 
 function seededRandom(seed) {
   return () => {
@@ -99,6 +100,7 @@ export function mountEarthOpening(container, { onComplete, onReady, onError, onD
   scene.add(stars);
   let departureProgress = 0, placementProgress = 0, placementElapsed = 0;
   let placementReady = false, choiceAnnounced = false;
+  let departureTarget;
   function frameCountrySelection() {
     const width = container.clientWidth, height = container.clientHeight;
     if (!width || !height) return;
@@ -130,12 +132,13 @@ export function mountEarthOpening(container, { onComplete, onReady, onError, onD
       if (departureRequested) startFlight();
     }
   }
-  function startFlight() {
+  function startFlight(countryCode) {
+    if (countryCode) departureTarget = getCountry(countryCode).flightTarget;
     departureRequested = true;
     if (disposed || !placementReady || flight) return;
     controls.enabled = false;
     onDepart();
-    flight = createCloudApproach({ camera, clouds,
+    flight = createCloudApproach({ camera, clouds, target: departureTarget,
       reducedMotion: () => reducedMotion.matches,
       onProgress: (progress, gap) => {
         departureProgress = progress;

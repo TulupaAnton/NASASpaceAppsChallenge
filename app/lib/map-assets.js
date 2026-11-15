@@ -1,22 +1,11 @@
 import { loadFinlandGeometry } from '../../public/legacy/finland-geometry';
-import { collectRegions, findRegion, IMAGE_HEIGHT, IMAGE_WIDTH, project } from '../../public/legacy/projection';
+import { collectRegions, findRegion } from '../../public/legacy/projection';
+import { getCountry, canadaSelection } from './countries.js';
+import { createMapProjection } from './map-projections.js';
+import { sites as finlandSites, selection } from './sites';
+import { prepareMapArtwork } from './map-artwork.js';
 
-let pending;
-
-function addRing(path, ring, bounds) {
-  for (const [index, point] of ring.entries()) {
-    const [x, y] = project(...point);
-    if (index) path.lineTo(x, y);
-    else path.moveTo(x, y);
-    if (bounds) {
-      bounds[0] = Math.min(bounds[0], x);
-      bounds[1] = Math.min(bounds[1], y);
-      bounds[2] = Math.max(bounds[2], x);
-      bounds[3] = Math.max(bounds[3], y);
-    }
-  }
-  path.closePath();
-}
+const pending = new Map();
 
 function regionLookup(regionData) {
   const cells = new Map();
@@ -41,102 +30,57 @@ function regionLookup(regionData) {
   };
 }
 
-function rasterize([west, north, east, south], precision, draw) {
-  const x = Math.floor(west) - 4;
-  const y = Math.floor(north) - 4;
-  const width = Math.ceil(east) + 4 - x;
-  const height = Math.ceil(south) + 4 - y;
-  const bitmap = document.createElement('canvas');
-  bitmap.width = width * precision;
-  bitmap.height = height * precision;
-  const context = bitmap.getContext('2d');
-  context.setTransform(precision, 0, 0, precision, -x * precision, -y * precision);
-  draw(context);
-  return { bitmap, x, y, width, height };
+function mapAssets(image, geometry, config, artwork) {
+  const projection = createMapProjection(geometry.projection);
+  const { project } = projection;
+  const sites = (config.sites ?? finlandSites).map(site => ({ ...site, xy: project(...site.point) }));
+  const select = config.code === 'CA' ? (point, region, site) => ({ ...canadaSelection(point, region, site), xy: project(...point) })
+    : (...args) => ({ ...selection(...args), countryCode: 'FI', countryName: 'Finland' });
+  return { image, ...artwork, projection, sites, select,
+    countryCode: config.code, regionAt: regionLookup(geometry.regionData) };
 }
 
-function prepareMap(image, { rings, regionData }) {
-  const country = new Path2D();
-  const outline = new Path2D();
-  const islands = new Path2D();
-  const bounds = [Infinity, Infinity, -Infinity, -Infinity];
-  for (const ring of rings) {
-    const ringPath = new Path2D();
-    addRing(ringPath, ring, bounds);
-    const [startX, startY] = ring[0];
-    const major = ring.some(([x, y]) => Math.abs(x - startX) > .16 || Math.abs(y - startY) > .16);
-    country.addPath(ringPath);
-    (major ? outline : islands).addPath(ringPath);
-  }
-
-  const allRegions = new Path2D();
-  const paths = new Map();
-  for (const region of regionData) {
-    const path = new Path2D();
-    for (const polygon of region.polygons) {
-      for (const ring of polygon) addRing(path, ring);
-    }
-    allRegions.addPath(path);
-    paths.set(region.name, path);
-  }
-
-  const cutout = rasterize(bounds, 2, ctx => {
-    ctx.clip(country, 'evenodd');
-    ctx.drawImage(image, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
+function loadWorkerMap(countryCode) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./map-worker.js', import.meta.url), { type: 'module' });
+    worker.onmessage = ({ data }) => {
+      worker.terminate();
+      if (data.error) { reject(new Error(data.error)); return; }
+      try {
+        const { image, geometry, highlights, ...artwork } = data;
+        resolve(mapAssets(image, geometry, getCountry(countryCode), { ...artwork, highlight: name => highlights.get(name) }));
+      } catch (error) { reject(error); }
+    };
+    worker.onerror = event => {
+      event.preventDefault();
+      worker.terminate();
+      reject(new Error('Unable to prepare country map in the background'));
+    };
+    worker.postMessage(countryCode);
   });
-
-  function borderLayer(scale) {
-    return rasterize(bounds, 2, ctx => {
-      ctx.fillStyle = 'rgba(106, 199, 169, .12)';
-      ctx.fill(country, 'evenodd');
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      ctx.lineWidth = .67 / scale;
-      ctx.strokeStyle = 'rgba(167, 229, 197, .52)';
-      ctx.stroke(allRegions);
-      ctx.lineWidth = .46 / scale;
-      ctx.strokeStyle = '#9befbe92';
-      ctx.stroke(islands);
-      ctx.lineWidth = 2.3 / scale;
-      ctx.strokeStyle = '#071411bc';
-      ctx.stroke(outline);
-      ctx.lineWidth = 1.15 / scale;
-      ctx.strokeStyle = '#b7f3d6';
-      ctx.stroke(outline);
-    });
-  }
-
-  const borders = borderLayer(1);
-  const zoomBorders = borderLayer(2.1);
-  let highlightedName, highlightLayer;
-  function highlight(name) {
-    if (name === highlightedName) return highlightLayer;
-    highlightedName = name;
-    const path = paths.get(name);
-    highlightLayer = path ? rasterize(bounds, 2, ctx => {
-      ctx.fillStyle = 'rgba(255, 175, 94, .30)';
-      ctx.fill(path, 'evenodd');
-      ctx.lineWidth = 1.05;
-      ctx.strokeStyle = '#ffbf77e0';
-      ctx.lineJoin = 'round';
-      ctx.stroke(path);
-    }) : undefined;
-    return highlightLayer;
-  }
-
-  return { image, bounds, cutout, borders, zoomBorders, highlight, regionAt: regionLookup(regionData) };
 }
 
-export function loadMap() {
-  if (!pending) {
-    const image = new Image();
-    image.src = '/legacy/assets/finland-satellite.webp';
-    pending = Promise.all([image.decode(), loadFinlandGeometry('/legacy/assets/finland-geometry.bin')])
-      .then(([, geometry]) => prepareMap(image, geometry))
+function loadCanvasMap(countryCode) {
+  const country = getCountry(countryCode);
+  const image = new Image();
+  image.src = country.image;
+  const geometry = countryCode === 'FI' ? loadFinlandGeometry(country.geometry)
+    : fetch(country.geometry).then(response => {
+      if (!response.ok) throw new Error('Unable to load country boundaries');
+      return response.json();
+    });
+  return Promise.all([image.decode(), geometry])
+    .then(([, geometry]) => mapAssets(image, geometry, country, prepareMapArtwork(image, geometry)));
+}
+
+export function loadMap(countryCode = 'FI') {
+  if (!pending.has(countryCode)) {
+    const background = countryCode === 'CA' && typeof Worker !== 'undefined' && typeof OffscreenCanvas !== 'undefined';
+    pending.set(countryCode, (background ? loadWorkerMap(countryCode).catch(() => loadCanvasMap(countryCode)) : loadCanvasMap(countryCode))
       .catch(error => {
-        pending = undefined;
+        pending.delete(countryCode);
         throw error;
-      });
+      }));
   }
-  return pending;
+  return pending.get(countryCode);
 }

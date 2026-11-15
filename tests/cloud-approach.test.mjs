@@ -3,6 +3,7 @@ import test from 'node:test';
 import * as THREE from 'three';
 import { createCloudApproach, createCloudDeparture, CLOUD_APPROACH_DURATION, CLOUD_APPROACH_CLEARANCE, CLOUD_APPROACH_TARGET, CLOUD_DEPARTURE_DURATION, CLOUD_DEPARTURE_RADIUS } from '../app/lib/earth/cloudApproach.js';
 import { CLOUD_DEPTH_INNER, CLOUD_DEPTH_LAYERS, cloudLayerAlpha, cloudLayerVisibility, createCloudDepth } from '../app/lib/earth/cloudDepth.js';
+import { getCountry } from '../app/lib/countries.js';
 
 function fixture(reduced = false) {
   const world = new THREE.Group(); world.rotation.z = -.21;
@@ -41,6 +42,24 @@ test('approach stops over the intended existing northern Finland cloud texel and
   assert.ok(Math.abs(THREE.MathUtils.radToDeg(Math.asin(p.y)) - CLOUD_APPROACH_TARGET.latitude) < 1e-9);
   const position = f.camera.position.clone(); f.flight.finish(); f.flight.tick(30);
   assert.equal(f.completed, 1); assert.ok(position.distanceTo(f.camera.position) < 1e-12);
+});
+
+test('Canada approach reaches its own existing cloud texel with continuous movement and unchanged cloud rotation', () => {
+  const f = fixture(), target = getCountry('CA').flightTarget;
+  const originalRotation = f.clouds.quaternion.clone();
+  const flight = createCloudApproach({ camera: f.camera, clouds: f.clouds, target, reducedMotion: () => false, onComplete() {} });
+  let previous = f.camera.position.clone();
+  flight.tick(0);
+  for (let i = 0; i <= 600; i++) {
+    flight.tick(1 / 120);
+    assert.ok(f.camera.position.distanceTo(previous) < .04, 'the longer orbital turn must remain continuous');
+    assert.ok(f.camera.position.length() > 1, 'the flight must not cross the Earth');
+    previous = f.camera.position.clone();
+  }
+  const local = f.camera.position.clone().applyMatrix4(f.clouds.matrixWorld.clone().invert()).normalize();
+  assert.ok(Math.abs(THREE.MathUtils.radToDeg(Math.atan2(-local.z, local.x)) - target.longitude) < 1e-9);
+  assert.ok(Math.abs(THREE.MathUtils.radToDeg(Math.asin(local.y)) - target.latitude) < 1e-9);
+  assert.ok(f.clouds.quaternion.angleTo(originalRotation) < 1e-7);
 });
 
 test('reduced motion finishes the isolated approach without starting a second cloud animation', () => {
