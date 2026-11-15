@@ -7,6 +7,11 @@ const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH 
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors = [];
+  const geometryRequests = new Set();
+  page.on('request', request => {
+    const pathname = new URL(request.url()).pathname;
+    if (/geometry\.(json|bin)$/.test(pathname)) geometryRequests.add(pathname);
+  });
   page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(() => {
     // Isolate map-preparation stalls from software-WebGL rendering in headless
@@ -66,6 +71,8 @@ try {
   assert.deepEqual(probe.workerErrors, []);
   assert.ok(probe.workerMaps.some(map => map.country === 'ca' && map.bitmap));
   assert.ok(probe.workerMaps.every(map => map.bitmap));
+  assert.ok(probe.workerMaps.every(map => map.country === 'ca'), 'only Canada needs background worker preparation');
+  assert.deepEqual([...geometryRequests].sort(), ['/canada/geometry.json', '/legacy/assets/finland-geometry.bin']);
   await page.waitForSelector('main[data-country="CA"][data-view="map"]', { timeout: 30000 });
   const flightTasks = await page.evaluate(() => {
     const p = window.flightProbe;
@@ -83,19 +90,9 @@ try {
   assert.ok(Number.isFinite(canada.ranking.scores.overall));
   assert.ok(Number.isFinite(canada.ranking.extra_metrics.water_discharge_m3s));
 
-  // Switch directly from analysis to the new Mongolian map, then to Finland.
+  // Switch directly from Canadian analysis to Finland.
   const countries = page.getByRole('group', { name: 'Map country', exact: true });
-  await countries.getByRole('button', { name: 'Mongolia', exact: true }).click();
-  await page.waitForSelector('main[data-country="MN"][data-view="map"][data-switching="false"]');
-  await page.getByLabel('Choose a reference site', { exact: true }).selectOption({ label: 'Choibalsan' });
-  await page.locator('.analysis-panel .score-overview').waitFor();
-  assert.match(await page.locator('.analysis-panel').innerText(), /Mongolia/);
-  const mongoliaResponse = await page.request.get(new URL('/api/regions/mn_061', page.url()).href);
-  assert.equal(mongoliaResponse.status(), 200);
-  const mongolia = await mongoliaResponse.json();
-  assert.equal(mongolia.meta.country, 'mn');
-  assert.ok(Number.isFinite(mongolia.ranking.scores.overall));
-  assert.ok(Number.isFinite(mongolia.ranking.extra_metrics.water_discharge_m3s));
+  assert.deepEqual(await countries.getByRole('button').allTextContents(), ['Finland', 'Canada']);
   await countries.getByRole('button', { name: 'Finland', exact: true }).click();
   await page.waitForSelector('main[data-country="FI"][data-view="map"][data-switching="false"]');
   assert.deepEqual(errors, []);

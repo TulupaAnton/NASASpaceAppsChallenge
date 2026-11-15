@@ -9,7 +9,7 @@ import { decodeFinlandGeometry } from '../public/legacy/finland-geometry.js';
 const source = fs.readFileSync(new URL('../app/lib/map-view.js', import.meta.url), 'utf8')
   .replace(/^import .*;\n/gm, '').replace('export function createMapView', 'function createMapView');
 
-for (const [id, point] of [['fi', [26.1, 65.5]], ['mn', [105, 47.3]], ['ca', [-112, 57]]]) {
+for (const [id, point] of [['fi', [26.1, 65.5]], ['ca', [-112, 57]]]) {
   for (const dpr of [1, 2]) test(`${id}: animated canvas scale preserves arbitrary picking, resize and drag at DPR ${dpr}`, () => {
     const config = countries[id];
     const geometry = id === 'fi'

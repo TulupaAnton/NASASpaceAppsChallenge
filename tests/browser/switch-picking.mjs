@@ -39,7 +39,7 @@ try {
   await page.getByRole('button', { name: 'Skip intro', exact: true }).click();
   await page.waitForSelector('main[data-view="map"]');
 
-  for (const [id, point] of [['fi', [26.1, 65.5]], ['mn', [105, 47.3]], ['ca', [-112, 57]], ['fi', [26.1, 65.5]]]) {
+  for (const [id, point] of [['fi', [26.1, 65.5]], ['ca', [-112, 57]], ['fi', [26.1, 65.5]]]) {
     if (await page.locator('main').getAttribute('data-country') !== id.toUpperCase()) {
       await page.getByRole('group', { name: 'Map country', exact: true })
         .getByRole('button', { name: countries[id].name, exact: true }).click();

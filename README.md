@@ -4,7 +4,7 @@ A React and Next.js app for screening potential data center locations in Finland
 
 ## Run on localhost
 
-The country picker includes **Finland, Canada and Mongolia**. Each country has a
+The country picker includes **Finland and Canada**. Each country has a
 satellite map, regional reference locations, bundled climate/energy/water reports
 and exact-coordinate analysis. The updated analysis panel and country switcher
 are merged from `origin/datax-earth-clouds-analysis` through `332d71c`.

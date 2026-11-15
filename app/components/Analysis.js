@@ -226,7 +226,7 @@ function Energy({ report, analysis }) {
     <p className="chart-note">{solar ? 'Annual sunlight' : 'Average wind at 100 m'} <strong>{metric.displayValue}</strong>
     </p>
     {!solar && report.ranking.extra_metrics?.wind_source_used === 'merra2' && (
-      <p className="chart-note">{report.meta?.country === 'ca' || report.meta?.country === 'mn'
+      <p className="chart-note">{report.meta?.country === 'ca'
         ? 'Wind at 100 m is estimated from NASA POWER MERRA-2 data.'
         : 'Wind estimate from MERRA-2 because Global Wind Atlas was unavailable.'}</p>
     )}
@@ -236,7 +236,7 @@ function Energy({ report, analysis }) {
 
 function Method({ analysis, report, legacy }) {
   const { trend } = analysis;
-  const hasMappedHydro = report.meta?.country !== 'ca' && report.meta?.country !== 'mn';
+  const hasMappedHydro = report.meta?.country !== 'ca';
   const countryName = countries[report.meta?.country]?.name ?? 'Country';
   const years = period => period?.length === 2 ? period[0].slice(0, 4) + '–' + period[1].slice(0, 4) : unknown;
 

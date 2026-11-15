@@ -1,7 +1,6 @@
 import { analyzeExactPoint } from '../../../server/v6/exact-point';
 import { coordinateInFinland } from '../../../server/v6/finland';
 import { analyzeCanadaPoint, coordinateInCanada } from '../../../server/v6/canada';
-import { analyzeMongoliaPoint, coordinateInMongolia } from '../../../server/v6/mongolia';
 
 export const runtime = 'nodejs';
 
@@ -11,14 +10,13 @@ const MIN_SPAN_YEARS = 3;
 const COUNTRY_HANDLERS = {
   fi: { name: 'Finland', contains: coordinateInFinland, analyze: analyzeExactPoint },
   ca: { name: 'Canada', contains: coordinateInCanada, analyze: analyzeCanadaPoint },
-  mn: { name: 'Mongolia', contains: coordinateInMongolia, analyze: analyzeMongoliaPoint },
 };
 
 export async function POST(request) {
   const body = await request.json().catch(() => null);
   const { country = 'fi', lat, lon, startYear = 2005, endYear = 2024, horizonYears = 10 } = body ?? {};
   const handler = COUNTRY_HANDLERS[country];
-  if (!handler) return Response.json({ error: 'Choose Finland, Canada, or Mongolia.' }, { status: 400 });
+  if (!handler) return Response.json({ error: 'Choose Finland or Canada.' }, { status: 400 });
   if (!Number.isInteger(startYear) || !Number.isInteger(endYear) ||
     startYear < MIN_YEAR || endYear > MAX_YEAR || endYear - startYear + 1 < MIN_SPAN_YEARS) {
     return Response.json(

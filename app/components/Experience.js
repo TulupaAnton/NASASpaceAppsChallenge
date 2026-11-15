@@ -227,7 +227,7 @@ export default function Experience({ onLocationSelected } = {}) {
       await nextView.whenPainted();
       if (current !== run.current || !animate) return;
 
-      const order = { ca: 0, fi: 1, mn: 2 };
+      const order = { ca: 0, fi: 1 };
       const direction = (order[id] ?? 1) >= (order[previousCountry] ?? 1) ? 1 : -1;
       const options = { duration: 950, easing: 'cubic-bezier(.42, 0, .23, 1)', fill: 'both' };
       mapAnimations.current = [

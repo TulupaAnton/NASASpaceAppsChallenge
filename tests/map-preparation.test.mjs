@@ -2,11 +2,26 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
-import { getCountry } from '../app/lib/countries.js';
+import { countries, getCountry } from '../app/lib/countries.js';
 import { createMapProjection } from '../app/lib/map-projections.js';
-import { countrySites, selection } from '../app/lib/sites.js';
+import { countrySiteOptions, countrySites, selection } from '../app/lib/sites.js';
 import { collectRegions, findRegion } from '../public/legacy/projection.js';
 const root = new URL('../', import.meta.url);
+
+test('country configuration and reference catalogs contain only Finland and Canada', () => {
+  const supported = ['ca', 'fi'];
+  for (const catalog of [countries, countrySites, countrySiteOptions]) {
+    assert.deepEqual(Object.keys(catalog).sort(), supported);
+  }
+  for (const id of supported) {
+    assert.equal(getCountry(id.toUpperCase()), countries[id]);
+    assert.ok(countrySites[id].length > 0);
+    for (const asset of ['satellite', 'geometry', 'sources', 'credits']) {
+      assert.ok(fs.existsSync(new URL('public' + countries[id][asset].split('#')[0], root)));
+    }
+  }
+  assert.throws(() => getCountry('xx'), /Unknown country/);
+});
 
 function context2D(onTranslate = () => {}) {
   const methods = { translate: onTranslate, scale(k) { methods.k = k; },
@@ -30,7 +45,7 @@ async function prepare(code) {
   return promise;
 }
 
-for (const code of ['ca', 'mn']) test(`${code}: artwork, projection and selections use the same country after the merge`, async () => {
+for (const code of ['ca']) test(`${code}: artwork, projection and selections use the same country after the merge`, async () => {
   const assets = await prepare(code);
   assert.equal(assets.country, code);
   for (const site of countrySites[code]) {

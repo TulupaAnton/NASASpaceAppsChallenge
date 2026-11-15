@@ -1,13 +1,11 @@
 import { IMAGE_WIDTH, IMAGE_HEIGHT, project, unproject } from '../../public/legacy/projection.js';
 import { projectCanada, unprojectCanada } from './canada-projection.js';
-import { projectMongolia, unprojectMongolia } from './mongolia-projection.js';
 
 // Canada uses the same spherical Lambert conformal conic transform for the
 // raster, boundary paths and hit testing. All angles at the interface are degrees.
 export function createMapProjection(definition) {
   if (!definition) return { width: IMAGE_WIDTH, height: IMAGE_HEIGHT, project, unproject };
   if (definition.type === 'canada') return { width: IMAGE_WIDTH, height: IMAGE_HEIGHT, project: projectCanada, unproject: unprojectCanada };
-  if (definition.type === 'mongolia') return { width: IMAGE_WIDTH, height: IMAGE_HEIGHT, project: projectMongolia, unproject: unprojectMongolia };
   if (definition.type !== 'lambert-conformal-conic') throw new Error('Unsupported map projection');
   const rad = Math.PI / 180;
   const { width, height, parallels, latitude, longitude, scale, translate } = definition;

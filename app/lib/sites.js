@@ -2,8 +2,7 @@ import { finlandRegionId } from '../../public/legacy/finland-data.js';
 import { CACHED_POINTS } from '../../public/legacy/point-api.js';
 import { referenceSites } from '../../public/legacy/reference-sites.js';
 import canadaReferences from '../../public/canada/sites.json' with { type: 'json' };
-import mongoliaReferences from '../../public/mongolia/sites.json' with { type: 'json' };
-import { canadaSiteId, countries, mongoliaSiteId } from './countries.js';
+import { canadaSiteId, countries } from './countries.js';
 import { coordinates } from './format.js';
 
 const finlandReferences = [
@@ -15,9 +14,8 @@ const finlandReferences = [
 ];
 
 const canadaSites = canadaReferences.map(site => ({ ...site, major: true, siteId: canadaSiteId(site.code) }));
-const mongoliaSites = mongoliaReferences.map(site => ({ ...site, major: true, siteId: mongoliaSiteId(site.code) }));
 const finlandSites = finlandReferences.map(site => ({ ...site, siteId: site.siteId ?? finlandRegionId(site.region) }));
-export const countrySites = Object.fromEntries(Object.entries({ fi: finlandSites, ca: canadaSites, mn: mongoliaSites }).map(([id, references]) => [
+export const countrySites = Object.fromEntries(Object.entries({ fi: finlandSites, ca: canadaSites }).map(([id, references]) => [
   id, references.map((site, index) => ({ ...site, index, xy: countries[id].project(...site.point) })),
 ]));
 export const countrySiteOptions = Object.fromEntries(Object.entries(countrySites).map(([id, sites]) => [
