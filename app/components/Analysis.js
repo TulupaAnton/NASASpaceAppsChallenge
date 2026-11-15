@@ -11,86 +11,13 @@ import {
 } from '../lib/sites';
 import Comparison from './Comparison';
 import DashboardChart from './DashboardChartLazy';
+import DataPeriod from './DataPeriod';
 import Disclosure from './Disclosure';
 import { Icon } from './Icon';
 
-const HISTORY_PRESETS = [
-  { label: '2005–2024', startYear: 2005, endYear: 2024 },
-  { label: '1984–2024', startYear: 1984, endYear: 2024 },
-  { label: '2015–2024', startYear: 2015, endYear: 2024 },
-];
-const HORIZON_OPTIONS = [5, 10, 15, 20];
-const ALL_YEARS = Array.from({ length: 2024 - 1984 + 1 }, (_, i) => 1984 + i);
-
-function TimeWindowControls({ timeRange, onChange }) {
-  const { startYear, endYear, horizonYears } = timeRange;
-  const activePreset = HISTORY_PRESETS.find(
-    preset => preset.startYear === startYear && preset.endYear === endYear,
-  );
-
-  return <section className="card time-controls" aria-label="Time range and forecast horizon">
-    <div className="time-controls-row">
-      <span className="time-controls-label">History</span>
-      <div className="toggle" role="group" aria-label="Historical period presets">
-        {HISTORY_PRESETS.map(preset => (
-          <button
-            type="button"
-            key={preset.label}
-            aria-pressed={activePreset?.label === preset.label}
-            onClick={() => onChange({ ...timeRange, startYear: preset.startYear, endYear: preset.endYear })}
-          >
-            {preset.label}
-          </button>
-        ))}
-      </div>
-      <div className="time-selects">
-        <label>
-          <span className="sr-only">Start year</span>
-          <select
-            aria-label="From year"
-            value={startYear}
-            onChange={event => onChange({ ...timeRange, startYear: Number(event.target.value) })}
-          >
-            {ALL_YEARS.filter(y => y <= endYear - 2).map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </label>
-        <span aria-hidden="true">–</span>
-        <label>
-          <span className="sr-only">End year</span>
-          <select
-            aria-label="To year"
-            value={endYear}
-            onChange={event => onChange({ ...timeRange, endYear: Number(event.target.value) })}
-          >
-            {ALL_YEARS.filter(y => y >= startYear + 2).map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </label>
-      </div>
-    </div>
-    <div className="time-controls-row">
-      <span className="time-controls-label">Forecast</span>
-      <div className="toggle" role="group" aria-label="Forecast horizon">
-        {HORIZON_OPTIONS.map(years => (
-          <button
-            type="button"
-            key={years}
-            aria-pressed={horizonYears === years}
-            onClick={() => onChange({ ...timeRange, horizonYears: years })}
-          >
-            {years}y
-          </button>
-        ))}
-      </div>
-      <span className="chart-note time-controls-span">
-        {endYear - startYear + 1}y history · {endYear + 1}–{endYear + horizonYears} scenario
-      </span>
-    </div>
-  </section>;
-}
-
 function rankVerdict(rank, count, customWindow) {
   if (customWindow && rank === null) {
-    return 'Cohort rank disabled for custom time windows (calibrated only for 2005–2024, 10y).';
+    return 'Regional rankings are available with the default dates.';
   }
   if (rank === null || !count) return 'Site estimate · Unranked';
   if (rank <= count / 3) return 'Near the top of the regional ranking';
@@ -168,14 +95,14 @@ function Temperature({ report, analysis }) {
         .map(row => [row.year, row.temperature]))
       : new Map();
     const series = [{
-      label: historical ? 'Historical estimate' : 'Scenario', data: observations.map(row => row.temperature),
-      tone: historical ? 'mint' : 'muted', fill: historical, dash: historical ? undefined : [5, 4],
+      label: historical ? 'Historical estimate' : 'Temperature projection', data: observations.map(row => row.temperature),
+      tone: historical ? 'mint' : 'water', fill: historical, dash: historical ? undefined : [5, 4],
     }];
     if ([...fitted.values()].some(Number.isFinite)) series.push({
       label: 'Fitted trend', tone: 'mint', dash: [5, 4], data: observations.map(row => fitted.get(row.year) ?? null),
     });
     return {
-      type: 'line', title: historical ? 'Observed annual air temperature' : 'Scenario annual air temperature',
+      type: 'line', title: historical ? 'Historical annual air temperature' : 'Projected annual air temperature',
       labels: observations.map(row => String(row.year)), unit: '°C', axisLabel: 'Air temperature (°C)',
       series, tickLimit: 6,
     };
@@ -186,10 +113,11 @@ function Temperature({ report, analysis }) {
   return <section className="detail-section">
     <div className="chart-heading">
       <h3><Icon name="temp" /> Annual air temperature</h3>
-      <Toggle label="Temperature view" options={[[ 'observed', 'Observed' ], ['scenario', 'Scenario']]} current={kind} change={setKind} />
+      <Toggle label="Temperature view" options={[[ 'observed', 'Historical data' ], ['scenario', 'Projection']]} current={kind} change={setKind} />
     </div>
     <p className="chart-note">
-      {historical ? <>Historical mean <strong>{mean.displayValue}</strong></> : 'Illustrates how temperatures could change if the historical pattern continues.'}
+      {spec.labels.length > 0 && <>{spec.labels[0]}–{spec.labels.at(-1)} · </>}
+      {historical ? <>Average <strong>{mean.displayValue}</strong></> : 'Estimates temperatures if the historical trend continues.'}
     </p>
     {historical && <p className="chart-note">
       Trend <strong>{slopeText(trend.slopePerDecade)}</strong> · {significanceText(trend.isSignificant)}
@@ -304,6 +232,12 @@ export default function Analysis({ site, onChooseSite, shortlist, onAdd, onRemov
   const current = result?.site === site && result.exact === exact && result.attempt === attempt && result.rangeKey === rangeKey ? result : null;
   const report = current?.report;
   const analysis = useMemo(() => report ? normalizeAnalysis(report, site) : null, [report, site]);
+  const projectionTemperature = useMemo(() => {
+    if (!report) return null;
+    const values = annualTemperatures(report.chart.scenario_monthly ?? []);
+    if (values.length !== timeRange.horizonYears || values.some(({ temperature }) => !Number.isFinite(temperature))) return null;
+    return values.reduce((total, { temperature }) => total + temperature, 0) / values.length;
+  }, [report, timeRange.horizonYears]);
   const legacy = canadian ? country.sources : '/legacy/index.html?' + new URLSearchParams({
     lat: site.latitude, lon: site.longitude,
     ...(site.index === undefined ? {} : { marker: site.index }),
@@ -324,12 +258,14 @@ export default function Analysis({ site, onChooseSite, shortlist, onAdd, onRemov
       </div>
       <button type="button" className="back-button add-site" disabled={added || shortlist.length >= 3}
         title={!added && shortlist.length >= 3 ? 'Remove a comparison site before adding another' : undefined}
-        onClick={() => { onAdd({ ...site, exact, report }); setTab('compare'); }}>
+        onClick={() => { onAdd({ ...site, exact, report, reportRangeKey: rangeKey }); setTab('compare'); }}>
         <Icon name="plus" />{added ? 'Added to comparison' : 'Add to comparison'}
       </button>
     </div>
 
-    <TimeWindowControls timeRange={timeRange} onChange={setTimeRange} />
+    <DataPeriod range={timeRange} onApply={setTimeRange} comparing={tab === 'compare'}
+      historyTemperature={tab === 'site' ? analysis?.metrics[0].value : null}
+      projectionTemperature={tab === 'site' ? projectionTemperature : null} />
 
     {tab === 'compare' && <Comparison candidates={shortlist} remove={onRemove} leader={report?.leader} onChooseSite={onChooseSite} timeRange={timeRange} />}
     {tab === 'site' && analysis && <>
@@ -344,7 +280,8 @@ export default function Analysis({ site, onChooseSite, shortlist, onAdd, onRemov
       </Disclosure>
       <Method analysis={analysis} report={report} legacy={legacy} />
     </>}
-    {tab === 'site' && !current && <p className="card" role="status">{exact || customWindow ? 'Analyzing selected coordinates…' : 'Loading regional sample…'}</p>}
+    {tab === 'site' && !current && <p className="card" role="status">{customWindow ? 'Calculating results for the selected dates…'
+      : exact ? 'Analyzing selected coordinates…' : 'Loading regional sample…'}</p>}
     {tab === 'site' && current?.error && <div className="card" role="status">
       <p>{current.error}</p><button className="text-button" onClick={() => load(exact)}>Retry</button>
     </div>}
