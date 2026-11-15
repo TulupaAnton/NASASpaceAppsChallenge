@@ -2,7 +2,8 @@ import { finlandRegionId } from '../../public/legacy/finland-data';
 import { CACHED_POINTS } from '../../public/legacy/point-api';
 import { referenceSites } from '../../public/legacy/reference-sites';
 import canadaReferences from '../../public/canada/sites.json';
-import { canadaSiteId, countries } from './countries';
+import mongoliaReferences from '../../public/mongolia/sites.json';
+import { canadaSiteId, countries, mongoliaSiteId } from './countries';
 import { coordinates } from './format';
 
 const finlandReferences = [
@@ -14,8 +15,9 @@ const finlandReferences = [
 ];
 
 const canadaSites = canadaReferences.map(site => ({ ...site, major: true, siteId: canadaSiteId(site.code) }));
+const mongoliaSites = mongoliaReferences.map(site => ({ ...site, major: true, siteId: mongoliaSiteId(site.code) }));
 const finlandSites = finlandReferences.map(site => ({ ...site, siteId: site.siteId ?? finlandRegionId(site.region) }));
-export const countrySites = Object.fromEntries(Object.entries({ fi: finlandSites, ca: canadaSites }).map(([id, references]) => [
+export const countrySites = Object.fromEntries(Object.entries({ fi: finlandSites, ca: canadaSites, mn: mongoliaSites }).map(([id, references]) => [
   id, references.map((site, index) => ({ ...site, index, xy: countries[id].project(...site.point) })),
 ]));
 export const countrySiteOptions = Object.fromEntries(Object.entries(countrySites).map(([id, sites]) => [
@@ -66,7 +68,7 @@ export function timeRangeKey(range = DEFAULT_TIME_RANGE) {
 }
 
 export async function getSiteReport(site, signal) {
-  const sample = site.country !== 'ca' && CACHED_POINTS.find(point =>
+  const sample = (!site.country || site.country === 'fi') && CACHED_POINTS.find(point =>
     Math.abs(site.latitude - point.latitude) < .00005 && Math.abs(site.longitude - point.longitude) < .00005);
   return readResponse(await fetch(`/api/regions/${sample?.id ?? site.siteId}`, { signal }));
 }

@@ -226,7 +226,7 @@ function Energy({ report, analysis }) {
     <p className="chart-note">{solar ? 'Annual sunlight' : 'Average wind at 100 m'} <strong>{metric.displayValue}</strong>
     </p>
     {!solar && report.ranking.extra_metrics?.wind_source_used === 'merra2' && (
-      <p className="chart-note">{report.meta?.country === 'ca'
+      <p className="chart-note">{report.meta?.country === 'ca' || report.meta?.country === 'mn'
         ? 'Wind at 100 m is estimated from NASA POWER MERRA-2 data.'
         : 'Wind estimate from MERRA-2 because Global Wind Atlas was unavailable.'}</p>
     )}
@@ -236,11 +236,12 @@ function Energy({ report, analysis }) {
 
 function Method({ analysis, report, legacy }) {
   const { trend } = analysis;
-  const canadian = report.meta?.country === 'ca';
+  const noWater = report.meta?.country === 'ca' || report.meta?.country === 'mn';
+  const countryName = countries[report.meta?.country]?.name ?? 'Country';
   const years = period => period?.length === 2 ? period[0].slice(0, 4) + '–' + period[1].slice(0, 4) : unknown;
 
   return <Disclosure label="Method & statistics">
-    <p>{canadian ? 'The screening score weighs outdoor cooling climate (30%) and renewable resources (70%). Water is outside the scope of this dataset.'
+    <p>{noWater ? 'The screening score weighs outdoor cooling climate (30%) and renewable resources (70%). Water is outside the scope of this dataset.'
       : 'The screening score weighs outdoor cooling climate, renewable resources, and modeled water indicators. A build decision also depends on grid capacity, fiber connectivity, land, and permits.'}</p>
     <dl className="method-grid">
       <div><dt>Historical record</dt><dd>{years(report.meta?.historical_period)}</dd></div>
@@ -250,16 +251,16 @@ function Method({ analysis, report, legacy }) {
       <div><dt>Unadjusted test</dt><dd>{probabilityText(trend.pValue)}</dd></div>
       <div><dt>FDR-adjusted test</dt><dd>{probabilityText(trend.pAdjusted)}</dd></div>
       <div><dt>Trend result at 5%</dt><dd>{significanceText(trend.isSignificant)}{trend.significanceBasis && (trend.significanceBasis === 'fdr' ? ' · Adjusted across regions' : ' · Single-site test')}</dd></div>
-      {!canadian && <div><dt>Mapped water sample</dt><dd>{analysis.metrics[4].displayValue}</dd></div>}
+      {!noWater && <div><dt>Mapped water sample</dt><dd>{analysis.metrics[4].displayValue}</dd></div>}
     </dl>
-    {!canadian && <p>The mapped sample is a separate reference layer. The score uses modeled water proximity and flow. Neither distance establishes water access for a project.</p>}
+    {!noWater && <p>The mapped sample is a separate reference layer. The score uses modeled water proximity and flow. Neither distance establishes water access for a project.</p>}
     <table className="method-table">
       <thead><tr><th scope="col">Factor</th><th scope="col">Score / 100</th><th scope="col">Weight</th><th scope="col">Points</th></tr></thead>
       <tbody>{analysis.score.factors.map(factor => <tr key={factor.key}>
         <th scope="row">{factor.label}</th><td>{valueText(factor.score)}</td><td>{percentText(factor.weight)}</td><td>{valueText(factor.contribution)}</td>
       </tr>)}</tbody>
     </table>
-    <a className="text-button" href={legacy}>{canadian ? 'Canada data & sources' : 'Regional report & CSV downloads'} <Icon name="upRight" /></a>
+    <a className="text-button" href={legacy}>{noWater ? `${countryName} data & sources` : 'Regional report & CSV downloads'} <Icon name="upRight" /></a>
   </Disclosure>;
 }
 
@@ -274,8 +275,8 @@ export default function Analysis({ site, onChooseSite, shortlist, onAdd, onRemov
   const rangeKey = timeRangeKey(timeRange);
   const customWindow = !isDefaultTimeRange(timeRange);
   const country = countries[site.country ?? 'fi'];
-  const canadian = country.id === 'ca';
-  const hasReference = site.index !== undefined || (canadian && !!site.siteId);
+  const nonLegacyCountry = country.id !== 'fi';
+  const hasReference = site.index !== undefined || (nonLegacyCountry && !!site.siteId);
   const added = shortlist.some(candidate => selectionKey(candidate) === selectionKey(site));
 
   useEffect(() => { if (panel.current) panel.current.scrollTop = 0; }, [site, tab]);
@@ -304,7 +305,7 @@ export default function Analysis({ site, onChooseSite, shortlist, onAdd, onRemov
   const current = result?.site === site && result.exact === exact && result.attempt === attempt && result.rangeKey === rangeKey ? result : null;
   const report = current?.report;
   const analysis = useMemo(() => report ? normalizeAnalysis(report, site) : null, [report, site]);
-  const legacy = canadian ? country.sources : '/legacy/index.html?' + new URLSearchParams({
+  const legacy = nonLegacyCountry ? country.sources : '/legacy/index.html?' + new URLSearchParams({
     lat: site.latitude, lon: site.longitude,
     ...(site.index === undefined ? {} : { marker: site.index }),
   });
@@ -337,7 +338,7 @@ export default function Analysis({ site, onChooseSite, shortlist, onAdd, onRemov
       <Disclosure label="Measurements and charts">
         <Temperature report={report} analysis={analysis} />
         <Energy report={report} analysis={analysis} />
-        {!canadian && <section className="detail-section">
+        {!nonLegacyCountry && <section className="detail-section">
           <h3>Modeled water proximity</h3>
           <p>{analysis.metrics[3].displayValue}</p>
         </section>}

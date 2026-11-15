@@ -248,6 +248,7 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
 .country-search:focus-within::before { border-color: #514a3e; }
 .country-search[data-expanded="true"]::before { bottom: -36px; border-color: #514a3e; }
 .country-search[data-expanded="true"][data-results="2"]::before { bottom: -72px; }
+.country-search[data-expanded="true"][data-results="3"]::before { bottom: -108px; }
 .country-search input {
   display: block;
   width: 100%;

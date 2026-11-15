@@ -92,7 +92,7 @@ function deltaValue(metric, base, current) {
 
 function Difference({ candidates, analyses, reports, differences }) {
   const baseline = analyses[0];
-  const canadian = candidates[0]?.country === 'ca';
+  const noWater = candidates[0]?.country === 'ca' || candidates[0]?.country === 'mn';
   const spec = useMemo(() => differences.some(item => item.factors) ? ({
     type: 'bar', title: 'Weighted score changes compared with A', horizontal: true,
     unit: 'points', axisLabel: 'Change from A (score points)', zero: true, labels: baseline.score.factors.map(item => item.label),
@@ -115,7 +115,7 @@ function Difference({ candidates, analyses, reports, differences }) {
             {input && <> · {input.label} {deltaText(input.change, 'points')}</>}
           </p>}
           <dl className="delta-values">
-            {metricDefinitions.filter(metric => !canadian || metric.key !== 'scoring_water_proximity').map((metric, i) => <div key={metric.key}>
+            {metricDefinitions.filter(metric => !noWater || metric.key !== 'scoring_water_proximity').map((metric, i) => <div key={metric.key}>
               <dt>{metric.label}</dt><dd>{deltaValue(metric, baseline?.metrics[i], current?.metrics[i])}</dd>
             </div>)}
           </dl>
@@ -133,7 +133,7 @@ function RawMeasurements({ candidates, analyses, reports }) {
         <h3>{letters[index]} · {siteLabel(site)}</h3>
         <p>{sourceLabel(reports[index])}</p>
         <dl className="delta-values">
-          {metricDefinitions.filter(metric => site.country !== 'ca' || metric.key !== 'scoring_water_proximity').map((metric, i) => <div key={metric.key}>
+          {metricDefinitions.filter(metric => (site.country !== 'ca' && site.country !== 'mn') || metric.key !== 'scoring_water_proximity').map((metric, i) => <div key={metric.key}>
             <dt>{metric.label}</dt><dd>{analyses[index]?.metrics[i]?.displayValue ?? unknown}</dd>
           </div>)}
         </dl>

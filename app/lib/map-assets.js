@@ -132,9 +132,10 @@ function prepareMap(image, { rings, regionData }, { id, project, unproject }) {
   };
 }
 
-async function loadCanadaGeometry() {
-  const response = await fetch('/canada/geometry.json');
-  if (!response.ok) throw new Error('Canada boundaries could not be loaded.');
+async function loadCountryGeometry(country) {
+  const folder = country === 'ca' ? 'canada' : 'mongolia';
+  const response = await fetch(`/${folder}/geometry.json`);
+  if (!response.ok) throw new Error(`${countries[country].name} boundaries could not be loaded.`);
   return response.json();
 }
 
@@ -143,7 +144,9 @@ export function loadMap(country) {
     const config = countries[country];
     const image = new Image();
     image.src = config.satellite;
-    const geometry = country === 'ca' ? loadCanadaGeometry() : loadFinlandGeometry('/legacy/assets/finland-geometry.bin');
+    const geometry = country === 'fi'
+      ? loadFinlandGeometry('/legacy/assets/finland-geometry.bin')
+      : loadCountryGeometry(country);
     const task = Promise.all([image.decode(), geometry])
       .then(([, data]) => prepareMap(image, data, config))
       .catch(error => {

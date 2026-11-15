@@ -197,6 +197,7 @@ export default function Experience() {
         snapshot.hidden = false;
       }
 
+      const previousCountry = activeCountry.current;
       activeCountry.current = id;
       setCountryId(id);
       setSelected(null);
@@ -207,7 +208,8 @@ export default function Experience() {
       await nextView.whenPainted();
       if (current !== run.current || !animate) return;
 
-      const direction = id === 'ca' ? 1 : -1;
+      const order = { ca: 0, fi: 1, mn: 2 };
+      const direction = (order[id] ?? 1) >= (order[previousCountry] ?? 1) ? 1 : -1;
       const options = { duration: 950, easing: 'cubic-bezier(.42, 0, .23, 1)', fill: 'both' };
       mapAnimations.current = [
         map.animate([
