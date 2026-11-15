@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="finland-point-api" content="">
+  <meta name="theme-color" content="#040708">
+  <meta name="description" content="Watch daylight sweep across Earth, descend to Finland, and compare climate, renewable energy, water, and terrain for data-center screening.">
+  <title>Earth to Finland</title>
+  <link rel="icon" href="assets/terra-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="siting-panel.css">
+  <script src="app.js" type="module"></script>
+</head>
+<body>
+  <main id="experience" data-phase="flight" aria-label="Earth to Finland">
+    <video id="flight" class="flight" preload="metadata" muted playsinline poster="../flight/globe.webp" aria-label="Earth lights up as the camera flies toward Finland">
+      <source src="../flight/globe.mp4" type="video/mp4">
+    </video>
+
+    <canvas id="map" class="map" tabindex="-1" role="region" aria-label="Interactive satellite map of Finland" aria-describedby="map-help" aria-hidden="true"></canvas>
+    <p id="map-help" class="visually-hidden">Select a point in Finland with a click or tap. Drag or use the arrow keys to pan. Use plus or minus to zoom, Home to reset the view, and Enter to select the map center.</p>
+
+    <button id="center-play" class="center-play" aria-label="Play Earth flight" type="button" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.1v13.8L19.4 12 8 5.1Z" fill="currentColor"/></svg>
+    </button>
+
+    <aside id="point-panel" class="point-panel" aria-label="Site analysis" hidden></aside>
+    <div class="map-information">
+      <label for="site-picker"><i aria-hidden="true"></i><span class="visually-hidden">Select a reference site</span></label>
+      <select id="site-picker" aria-label="Choose a site from the map"><option value="">Choose a site</option></select>
+      <a href="/">← Finland map</a>
+      <a href="data-package.html">Data &amp; sources</a>
+    </div>
+
+    <a class="source-link" href="credits.html">Map and image credits</a>
+  </main>
+</body>
+</html>

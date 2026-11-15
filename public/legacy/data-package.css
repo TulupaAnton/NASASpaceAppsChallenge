@@ -1,0 +1,30 @@
+@font-face{font-family:"DM Sans";src:url("assets/dm-sans-600.woff2") format("woff2");font-weight:600;font-display:swap}
+:root{color-scheme:dark;font-family:"DM Sans",system-ui,sans-serif;background:#0a1411;color:#ecf0e2}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0}
+main{width:min(900px,calc(100% - 40px));margin:0 auto;padding:30px 0 60px}
+nav,.downloads,.list-heading{display:flex;align-items:center;flex-wrap:wrap;gap:12px 18px}
+nav{justify-content:space-between;font-size:.9rem}
+a{color:#dfe9bb;text-underline-offset:3px}
+header{border-bottom:1px solid #394a39;padding:2.4rem 0 1.65rem}
+h1{font-size:clamp(2.15rem,6vw,4.05rem);letter-spacing:-.055em;line-height:1.05;margin:0}
+h2{font-size:1.25rem;letter-spacing:-.018em;margin:0 0 .6rem}
+p{max-width:72ch;color:#b9c9ba;line-height:1.6;font-size:.94rem}
+.downloads{margin-top:1.2rem;margin-bottom:14px}
+.downloads a,.file-button{border:1px solid #78876b;border-radius:8px;background:#1a2b21;padding:.58rem .72rem;color:#f2f0df;text-decoration:none;font:inherit;cursor:pointer}
+.downloads a:hover,.file-button:hover{background:#2c3e2d}
+section{padding-top:1.7rem}
+.list-heading h2{flex:1 0 8em;margin:0}
+.list-heading label{font-size:.84rem;color:#b9c9ba}
+#file-filter{max-width:100%;padding:.55rem .65rem;border:1px solid #627661;border-radius:7px;background:#15231b;font:inherit}
+#package-status{min-height:1.5em;margin:.5em 0;font-size:.84rem}
+details{background:#111e17;border:1px solid #304436;border-radius:9px;margin-bottom:7px}
+summary{padding:.8rem .9rem;cursor:pointer}
+details ul{margin:0;padding:0 12px 12px;list-style:none}
+li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:.3rem 0;min-height:42px;border-top:1px solid #2b3d31}
+li span:first-child{overflow-wrap:anywhere;flex:1;font:400 .83rem/1.3 ui-monospace,monospace}
+.standalone{columns:2;column-gap:26px}
+.file-size{width:5em;text-align:right;color:#9db09e;font-size:.74rem;white-space:nowrap}
+.file-button{min-width:42px;padding:.32rem .45rem;font-size:.76rem}
+:focus-visible{outline:2px solid #f9d997;outline-offset:3px}
+@media(max-width:530px){main{width:calc(100% - 26px);padding-top:20px}.file-size{display:none}.standalone{columns:1}}

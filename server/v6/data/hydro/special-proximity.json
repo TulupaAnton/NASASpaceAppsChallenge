@@ -1,0 +1,52 @@
+{
+  "inari": {
+    "source": "SYKE Ranta10-derived user-supplied sparse point sample",
+    "status": "approximate_sample_proximity_not_shoreline_distance",
+    "sampling_cell_m": 3400,
+    "sea": {
+      "distance_to_sample_km": 362.711,
+      "sample_lat": 65.78902,
+      "sample_lon": 24.51794
+    },
+    "lake": {
+      "distance_to_sample_km": 0.22,
+      "sample_lat": 68.90518,
+      "sample_lon": 27.03428
+    },
+    "river": {
+      "distance_to_sample_km": 1.668,
+      "sample_lat": 68.90416,
+      "sample_lon": 26.9872
+    },
+    "nearest_surface_type": "lake",
+    "nearest_surface_sample_km": 0.22,
+    "nearest_freshwater_type": "lake",
+    "nearest_freshwater_sample_km": 0.22,
+    "used_in_score": false
+  },
+  "rauma": {
+    "source": "SYKE Ranta10-derived user-supplied sparse point sample",
+    "status": "approximate_sample_proximity_not_shoreline_distance",
+    "sampling_cell_m": 3400,
+    "sea": {
+      "distance_to_sample_km": 2.275,
+      "sample_lat": 61.11576,
+      "sample_lon": 21.47959
+    },
+    "lake": {
+      "distance_to_sample_km": 3.968,
+      "sample_lat": 61.16276,
+      "sample_lon": 21.4807
+    },
+    "river": {
+      "distance_to_sample_km": 1.145,
+      "sample_lat": 61.12622,
+      "sample_lon": 21.49016
+    },
+    "nearest_surface_type": "river",
+    "nearest_surface_sample_km": 1.145,
+    "nearest_freshwater_type": "river",
+    "nearest_freshwater_sample_km": 1.145,
+    "used_in_score": false
+  }
+}
