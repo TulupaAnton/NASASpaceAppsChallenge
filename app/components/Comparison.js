@@ -5,7 +5,9 @@ import { annualTemperatures, months } from '../lib/chart-data';
 import { coordinates } from '../lib/format';
 import { deltaText, unknown, valueText } from '../lib/analysis-format';
 import { comparableScores, factorDefinitions, metricDefinitions, normalizeAnalysis, sourceLabel } from '../lib/site-analysis';
-import { comparisonColors, getAnalysisReport, selectionKey, siteLabel } from '../lib/sites';
+import {
+  comparisonColors, DEFAULT_TIME_RANGE, getAnalysisReport, isDefaultTimeRange, selectionKey, siteLabel, timeRangeKey,
+} from '../lib/sites';
 import DashboardChart from './DashboardChartLazy';
 import Disclosure from './Disclosure';
 
@@ -139,17 +141,23 @@ function RawMeasurements({ candidates, analyses, reports }) {
   </Disclosure>;
 }
 
-export default function Comparison({ candidates, remove, leader, onChooseSite }) {
+export default function Comparison({ candidates, remove, leader, onChooseSite, timeRange = DEFAULT_TIME_RANGE }) {
   const [result, setResult] = useState(null);
   const [attempt, setAttempt] = useState(0);
-  const key = [attempt, ...candidates.map(site => selectionKey(site) + ':' + site.exact)].join(':');
+  const rangeKey = timeRangeKey(timeRange);
+  const key = [attempt, rangeKey, ...candidates.map(site => selectionKey(site) + ':' + site.exact)].join(':');
   const count = candidates.length;
   const current = result?.key === key ? result : null;
 
   useEffect(() => {
     if (count < 2) return;
     const controller = new AbortController();
-    Promise.allSettled(candidates.map(site => site.report ?? getAnalysisReport(site, site.exact, controller.signal)))
+    const useCachedReport = isDefaultTimeRange(timeRange);
+    Promise.allSettled(
+      candidates.map(site => (useCachedReport && site.report)
+        ? site.report
+        : getAnalysisReport(site, site.exact, controller.signal, timeRange)),
+    )
       .then(outcomes => {
         if (!controller.signal.aborted) setResult({
           key,
@@ -158,7 +166,7 @@ export default function Comparison({ candidates, remove, leader, onChooseSite })
         });
       });
     return () => controller.abort();
-  }, [candidates, count, key]);
+  }, [candidates, count, key, timeRange]);
 
   const reports = current?.reports;
   const { analyses, differences, equal } = useMemo(() => {
@@ -182,7 +190,7 @@ export default function Comparison({ candidates, remove, leader, onChooseSite })
 
   return <>
     <section className="card compare-controls">
-      <div className="chart-heading"><h2>Compare locations</h2><span className="scope-title">{count} / 3</span></div>
+      <div className="chart-heading"><h2>Compare locations</h2><span className="scope-title">{count} / 3 · {timeRange.startYear}–{timeRange.endYear} (+{timeRange.horizonYears}y)</span></div>
       <p className="chart-note">Select locations on the map or use the site menu, then choose Add to comparison.</p>
       {leader && count < 3 && !candidates.some(site => site.siteId === leader.site_id) && (
         <button type="button" className="text-button compare-benchmark" onClick={() => onChooseSite(leader.site_id)}>

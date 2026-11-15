@@ -5,20 +5,99 @@ import { coordinates } from '../lib/format';
 import { annualTemperatures, months, resourceKey } from '../lib/chart-data';
 import { deltaText, percentText, probabilityText, significanceText, slopeText, unknown, valueText } from '../lib/analysis-format';
 import { factorDefinitions, normalizeAnalysis, sourceLabel } from '../lib/site-analysis';
-import { getAnalysisReport, selectionKey, siteLabel } from '../lib/sites';
+import {
+  DEFAULT_TIME_RANGE, getAnalysisReport, isDefaultTimeRange, selectionKey, siteLabel, timeRangeKey,
+} from '../lib/sites';
 import Comparison from './Comparison';
 import DashboardChart from './DashboardChartLazy';
 import Disclosure from './Disclosure';
 import { Icon } from './Icon';
 
-function rankVerdict(rank, count) {
+const HISTORY_PRESETS = [
+  { label: '2005–2024', startYear: 2005, endYear: 2024 },
+  { label: '1984–2024', startYear: 1984, endYear: 2024 },
+  { label: '2015–2024', startYear: 2015, endYear: 2024 },
+];
+const HORIZON_OPTIONS = [5, 10, 15, 20];
+const ALL_YEARS = Array.from({ length: 2024 - 1984 + 1 }, (_, i) => 1984 + i);
+
+function TimeWindowControls({ timeRange, onChange }) {
+  const { startYear, endYear, horizonYears } = timeRange;
+  const activePreset = HISTORY_PRESETS.find(
+    preset => preset.startYear === startYear && preset.endYear === endYear,
+  );
+
+  return <section className="card time-controls" aria-label="Time range and forecast horizon">
+    <div className="time-controls-row">
+      <span className="time-controls-label">History</span>
+      <div className="toggle" role="group" aria-label="Historical period presets">
+        {HISTORY_PRESETS.map(preset => (
+          <button
+            type="button"
+            key={preset.label}
+            aria-pressed={activePreset?.label === preset.label}
+            onClick={() => onChange({ ...timeRange, startYear: preset.startYear, endYear: preset.endYear })}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <div className="time-selects">
+        <label>
+          <span className="sr-only">Start year</span>
+          <select
+            aria-label="From year"
+            value={startYear}
+            onChange={event => onChange({ ...timeRange, startYear: Number(event.target.value) })}
+          >
+            {ALL_YEARS.filter(y => y <= endYear - 2).map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </label>
+        <span aria-hidden="true">–</span>
+        <label>
+          <span className="sr-only">End year</span>
+          <select
+            aria-label="To year"
+            value={endYear}
+            onChange={event => onChange({ ...timeRange, endYear: Number(event.target.value) })}
+          >
+            {ALL_YEARS.filter(y => y >= startYear + 2).map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </label>
+      </div>
+    </div>
+    <div className="time-controls-row">
+      <span className="time-controls-label">Forecast</span>
+      <div className="toggle" role="group" aria-label="Forecast horizon">
+        {HORIZON_OPTIONS.map(years => (
+          <button
+            type="button"
+            key={years}
+            aria-pressed={horizonYears === years}
+            onClick={() => onChange({ ...timeRange, horizonYears: years })}
+          >
+            {years}y
+          </button>
+        ))}
+      </div>
+      <span className="chart-note time-controls-span">
+        {endYear - startYear + 1}y history · {endYear + 1}–{endYear + horizonYears} scenario
+      </span>
+    </div>
+  </section>;
+}
+
+function rankVerdict(rank, count, customWindow) {
+  if (customWindow && rank === null) {
+    return 'Cohort rank disabled for custom time windows (calibrated only for 2005–2024, 10y).';
+  }
   if (rank === null || !count) return 'Site estimate · Unranked';
   if (rank <= count / 3) return 'Near the top of the regional ranking';
   if (rank <= count * 2 / 3) return 'Middle of the regional ranking';
   return 'Lower in the regional ranking';
 }
 
-function ScoreSummary({ analysis, report }) {
+function ScoreSummary({ analysis, report, customWindow }) {
   const { total, rank, ofTotal, factors } = analysis.score;
   const spec = useMemo(() => ({
     type: 'bar', title: 'How the factors build the score', unit: 'points',
@@ -43,7 +122,7 @@ function ScoreSummary({ analysis, report }) {
             <strong>{valueText(total)}<small> / 100</small></strong>
             {rank !== null && <span className="rank">Rank {rank} of {ofTotal}</span>}
           </div>
-          <p className="overview-verdict">{rankVerdict(rank, ofTotal)}</p>
+          <p className="overview-verdict">{rankVerdict(rank, ofTotal, customWindow)}</p>
         </> : <p className="overview-verdict">Score unavailable · Incomplete site data</p>}
       </div>
       <div className="overview-source">
@@ -157,7 +236,7 @@ function Method({ analysis, report, legacy }) {
   const years = period => period?.length === 2 ? period[0].slice(0, 4) + '–' + period[1].slice(0, 4) : unknown;
 
   return <Disclosure label="Method & statistics">
-    <p>The screening score weighs cooling conditions, renewable resources, and modeled water indicators. A build decision also depends on grid capacity, fiber connectivity, land, and permits.</p>
+    <p>The screening score weighs outdoor cooling climate, renewable resources, and modeled water indicators. A build decision also depends on grid capacity, fiber connectivity, land, and permits.</p>
     <dl className="method-grid">
       <div><dt>Historical record</dt><dd>{years(report.meta?.historical_period)}</dd></div>
       <div><dt>Scenario period</dt><dd>{years(report.meta?.scenario_period)}</dd></div>
@@ -181,11 +260,14 @@ function Method({ analysis, report, legacy }) {
 
 export default function Analysis({ site, onChooseSite, shortlist, onAdd, onRemove }) {
   const [tab, setTab] = useState('site');
+  const [timeRange, setTimeRange] = useState(DEFAULT_TIME_RANGE);
   const [request, setRequest] = useState(null);
   const [result, setResult] = useState(null);
   const panel = useRef(null);
   const exact = request?.site === site ? request.exact : site.index === undefined;
   const attempt = request?.site === site ? request.attempt : 0;
+  const rangeKey = timeRangeKey(timeRange);
+  const customWindow = !isDefaultTimeRange(timeRange);
   const added = shortlist.some(candidate => selectionKey(candidate) === selectionKey(site));
 
   useEffect(() => { if (panel.current) panel.current.scrollTop = 0; }, [site, tab]);
@@ -204,14 +286,14 @@ export default function Analysis({ site, onChooseSite, shortlist, onAdd, onRemov
   useEffect(() => {
     const controller = new AbortController();
     const { signal } = controller;
-    getAnalysisReport(site, exact, signal).then(
-      report => { if (!signal.aborted) setResult({ site, exact, attempt, report }); },
-      error => { if (!signal.aborted) setResult({ site, exact, attempt, error: error.message }); },
+    getAnalysisReport(site, exact, signal, timeRange).then(
+      report => { if (!signal.aborted) setResult({ site, exact, attempt, rangeKey, report }); },
+      error => { if (!signal.aborted) setResult({ site, exact, attempt, rangeKey, error: error.message }); },
     );
     return () => controller.abort();
-  }, [site, exact, attempt]);
+  }, [site, exact, attempt, rangeKey, timeRange]);
 
-  const current = result?.site === site && result.exact === exact && result.attempt === attempt ? result : null;
+  const current = result?.site === site && result.exact === exact && result.attempt === attempt && result.rangeKey === rangeKey ? result : null;
   const report = current?.report;
   const analysis = useMemo(() => report ? normalizeAnalysis(report, site) : null, [report, site]);
   const legacy = '/legacy/index.html?' + new URLSearchParams({
@@ -239,9 +321,11 @@ export default function Analysis({ site, onChooseSite, shortlist, onAdd, onRemov
       </button>
     </div>
 
-    {tab === 'compare' && <Comparison candidates={shortlist} remove={onRemove} leader={report?.leader} onChooseSite={onChooseSite} />}
+    <TimeWindowControls timeRange={timeRange} onChange={setTimeRange} />
+
+    {tab === 'compare' && <Comparison candidates={shortlist} remove={onRemove} leader={report?.leader} onChooseSite={onChooseSite} timeRange={timeRange} />}
     {tab === 'site' && analysis && <>
-      <ScoreSummary analysis={analysis} report={report} />
+      <ScoreSummary analysis={analysis} report={report} customWindow={customWindow} />
       <Disclosure label="Measurements and charts">
         <Temperature report={report} analysis={analysis} />
         <Energy report={report} analysis={analysis} />
@@ -252,14 +336,20 @@ export default function Analysis({ site, onChooseSite, shortlist, onAdd, onRemov
       </Disclosure>
       <Method analysis={analysis} report={report} legacy={legacy} />
     </>}
-    {tab === 'site' && !current && <p className="card" role="status">{exact ? 'Analyzing selected coordinates…' : 'Loading regional sample…'}</p>}
+    {tab === 'site' && !current && <p className="card" role="status">{exact || customWindow ? 'Analyzing selected coordinates…' : 'Loading regional sample…'}</p>}
     {tab === 'site' && current?.error && <div className="card" role="status">
       <p>{current.error}</p><button className="text-button" onClick={() => load(exact)}>Retry</button>
     </div>}
-    {tab === 'site' && <div className="analysis-tools">
-      <button className="text-button" onClick={() => load(!exact)}>
-        {exact ? 'View regional sample' : 'Analyze exact coordinates'} <Icon name="right" />
-      </button>
+    {tab === 'site' && (site.index !== undefined || customWindow) && <div className="analysis-tools">
+      {customWindow && site.index !== undefined ? (
+        <button className="text-button" onClick={() => { setTimeRange(DEFAULT_TIME_RANGE); load(false); }}>
+          View default regional sample (2005–2024) <Icon name="right" />
+        </button>
+      ) : site.index !== undefined && (
+        <button className="text-button" onClick={() => load(!exact)}>
+          {exact ? 'View regional sample' : 'Analyze exact coordinates'} <Icon name="right" />
+        </button>
+      )}
     </div>}
   </section>;
 }

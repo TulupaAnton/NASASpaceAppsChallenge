@@ -45,22 +45,43 @@ export function siteLabel(site) {
   return site.name ?? `Point ${site.latitude.toFixed(2)}° N, ${site.longitude.toFixed(2)}° E`;
 }
 
+export const DEFAULT_TIME_RANGE = { startYear: 2005, endYear: 2024, horizonYears: 10 };
+
+export function isDefaultTimeRange(range = DEFAULT_TIME_RANGE) {
+  return range.startYear === DEFAULT_TIME_RANGE.startYear &&
+    range.endYear === DEFAULT_TIME_RANGE.endYear &&
+    range.horizonYears === DEFAULT_TIME_RANGE.horizonYears;
+}
+
+export function timeRangeKey(range = DEFAULT_TIME_RANGE) {
+  return `${range.startYear}-${range.endYear}:${range.horizonYears}`;
+}
+
 export async function getSiteReport(site, signal) {
   const sample = CACHED_POINTS.find(point =>
     Math.abs(site.latitude - point.latitude) < .00005 && Math.abs(site.longitude - point.longitude) < .00005);
   return readResponse(await fetch(`/api/regions/${sample?.id ?? site.siteId}`, { signal }));
 }
 
-export async function getExactReport(site, signal) {
+export async function getExactReport(site, signal, timeRange = DEFAULT_TIME_RANGE) {
   const response = await fetch('/api/point', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lat: site.latitude, lon: site.longitude }), signal,
+    body: JSON.stringify({
+      lat: site.latitude,
+      lon: site.longitude,
+      startYear: timeRange.startYear,
+      endYear: timeRange.endYear,
+      horizonYears: timeRange.horizonYears,
+    }),
+    signal,
   });
   return pointReport(await readResponse(response));
 }
 
-export function getAnalysisReport(site, exact, signal) {
-  return exact ? getExactReport(site, signal) : getSiteReport(site, signal);
+export function getAnalysisReport(site, exact, signal, timeRange = DEFAULT_TIME_RANGE) {
+  return exact || !isDefaultTimeRange(timeRange)
+    ? getExactReport(site, signal, timeRange)
+    : getSiteReport(site, signal);
 }
 
 export const comparisonColors = ['#a3e7c8', '#ffc477', '#a4bfff'];

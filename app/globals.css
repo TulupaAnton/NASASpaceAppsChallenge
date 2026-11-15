@@ -486,3 +486,18 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
   .factor-legend dd:first-of-type { margin: 0; }
   .factor-explanation { grid-column: 1 / -1; }
 }
+
+.time-controls { display: grid; gap: 8px; }
+.time-controls-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.time-controls-label { color: var(--muted); font-size: 11px; min-width: 52px; }
+.time-selects { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; }
+.time-selects select {
+  background: #0d1715;
+  border: 1px solid #314540;
+  border-radius: 5px;
+  min-height: 28px;
+  padding-inline: 6px 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.time-controls-span { margin-top: 0; margin-left: auto; }

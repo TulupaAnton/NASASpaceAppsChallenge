@@ -1,7 +1,7 @@
 import { unknown, valueText } from './analysis-format.js';
 
 export const factorDefinitions = [
-  { key: 'climate', label: 'Cooling conditions', tone: 'mint', explanation: 'Cooler outdoor conditions can reduce mechanical cooling demand.' },
+  { key: 'climate', label: 'Outdoor cooling climate', tone: 'mint', explanation: 'Cooler outdoor conditions can reduce mechanical cooling demand.' },
   { key: 'renewables', label: 'Wind and solar', tone: 'amber', explanation: 'Estimates renewable energy potential near the location.' },
   { key: 'water', label: 'Water indicators', tone: 'water', explanation: 'Uses modeled water proximity and river flow to inform cooling assessment.' },
 ];
@@ -83,6 +83,8 @@ export function comparableScores(a, b) {
     const weights = ranking.insight?.effective_weights ?? meta?.weights ?? {};
     return JSON.stringify([
       meta?.scoring_mode,
+      meta?.historical_period ?? null,
+      meta?.scenario_period ?? null,
       ...factorDefinitions.map(({ key }) => weights[key]),
       [...(ranking.data_quality?.ranking_metrics_used ?? [])].sort(),
       ranking.extra_metrics?.wind_source_used ?? 'gwa',
