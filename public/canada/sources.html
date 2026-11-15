@@ -3,58 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Canada data &amp; sources — DataX</title>
+<title>Canada data and methodology</title>
 <style>
-  :root { color-scheme: dark; font: 16px/1.6 system-ui, sans-serif; background: #0a1411; color: #edf8f2; }
-  body { margin: 0; }
-  main { margin: 40px auto 64px; max-width: 820px; padding: 0 20px; }
-  nav { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: .9rem; margin-bottom: 28px; }
-  a { color: #acf3cd; text-underline-offset: 3px; }
-  h1 { font-size: clamp(2rem, 5vw, 3rem); line-height: 1.1; margin: 0 0 12px; letter-spacing: -.03em; }
-  h2 { font-size: 1.2rem; margin: 32px 0 10px; }
-  p { color: #b9c9ba; max-width: 72ch; }
-  .source-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-top: 14px; }
-  .source-card { border: 1px solid #304436; border-radius: 10px; background: #111e17; padding: 14px 16px; }
-  .source-card h3 { margin: 0 0 6px; font-size: 1rem; color: #f2f0df; }
-  .source-card p { margin: 0 0 10px; font-size: .86rem; line-height: 1.5; }
+  :root { color-scheme:dark; font: 16px/1.6 system-ui; background:#101a18; color:#edf8f2 }
+  main { margin: 48px auto; max-width: 690px; padding: 0 20px }
+  a { color:#acf3cd }
+  h2 { font-size: 1.2rem; margin-top: 32px }
 </style>
 </head>
 <body><main>
-<nav aria-label="Site">
-  <a href="/">← Back to map</a>
-  <a href="/legacy/data-package.html">Finland data &amp; sources</a>
-</nav>
-<h1>Canada data &amp; sources</h1>
-<p>Choose a province or territory’s reference city to explore bundled 2005–2024 NASA POWER monthly series, or click any land coordinate on the map for live analysis. Because Canada and Finland share the same MERRA-2 wind pipeline and fixed physical thresholds, locations in both countries can be compared side by side.</p>
-
-<h2>Screening methodology</h2>
-<p>Both Canadian reference sites and exact-coordinate queries use fixed screening weights: <strong>25%</strong> for climate and cooling demand, <strong>60%</strong> for solar and wind renewable resources, and <strong>15%</strong> for modeled water indicators. Screening estimates do not replace local grid, permitting, or water-rights studies.</p>
-
-<h2>Primary data sources</h2>
-<div class="source-list">
-  <article class="source-card">
-    <h3>NASA POWER (MERRA-2 &amp; CERES)</h3>
-    <p>Monthly air temperatures, incoming solar irradiation, and 100 m wind estimates (1984–2024), plus 2025–2034 seasonal trend scenarios.</p>
-    <a href="https://power.larc.nasa.gov/docs/services/api/temporal/monthly/">NASA POWER Monthly API →</a>
-  </article>
-  <article class="source-card">
-    <h3>NASA Blue Marble Next Generation</h3>
-    <p>July 2004 global satellite imagery (NASA Earth Observatory / GSFC; Reto Stöckli and Robert Simmon) for the 3D globe and Canadian basemap.</p>
-    <a href="https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/">NASA Blue Marble →</a>
-  </article>
-  <article class="source-card">
-    <h3>Copernicus GloFAS v4 &amp; DEM GLO-90</h3>
-    <p>River discharge estimates, elevation, and coastal detection via Open-Meteo Flood &amp; Elevation APIs (49-point stencil).</p>
-    <a href="https://open-meteo.com/en/docs/flood-api">Flood API →</a> ·
-    <a href="https://open-meteo.com/en/docs/elevation-api">Elevation API →</a>
-  </article>
-  <article class="source-card">
-    <h3>OpenStreetMap Overpass API</h3>
-    <p>Local Canadian hydrography index (162,397 lakes and rivers) used as an offline proximity fallback when live flood APIs are rate-limited.</p>
-    <a href="https://overpass-api.de/">Overpass API →</a>
-  </article>
-</div>
-
-<h2 id="map-credits">Map &amp; boundary credits</h2>
-<p>Provincial and territorial boundaries use <a href="https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/0">Statistics Canada, 2021 Census cartographic boundary files</a> (<a href="https://open.canada.ca/en/open-government-licence-canada">Open Government Licence – Canada</a>) and <a href="https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-1-states-provinces/">Natural Earth 1:10m Admin‑1 boundaries</a> in a Lambert conformal conic projection.</p>
+<a href="/">Back to the map</a>
+<h1>Canada data and methodology</h1>
+<p>Choose a province or territory’s reference city to explore the bundled 2005–2024 NASA POWER monthly series. A reference is one grid location, so its results can differ from conditions elsewhere in the province or territory. Exact-coordinate analysis fetches upstream grid data for the selected land point.</p>
+<h2>Climate and energy</h2>
+<p>NASA POWER provides MERRA‑2 temperatures and wind, CERES incoming solar irradiation, and an elevation value for the grid point. Wind at 100 m is estimated from the 10 m and 50 m wind series with an elevation-based air-density adjustment for wind power density. The 2025–2034 climate scenario extends the fitted seasonal trend.</p>
+<p><a href="https://power.larc.nasa.gov/docs/services/api/temporal/monthly/">NASA POWER monthly API and data documentation</a></p>
+<h2>Screening score</h2>
+<p>The Canadian references and exact points use V6’s fixed screening thresholds: 25% for climate and cooling, 60% for solar and wind, and 15% for modeled water indicators. Water inputs use Copernicus GloFAS v4 and Copernicus DEM GLO-90 through a 49-point stencil. These estimates do not establish project water access. Rankings cover the 13 Canadian reference locations.</p>
+<h2 id="map-credits">Map credits</h2>
+<p>Satellite basemap reprojected from NASA's July 2004 Blue Marble Next Generation imagery. Credit: NASA Earth Observatory / NASA Goddard Space Flight Center; Reto Stöckli and Robert Simmon.</p>
+<p><a href="https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/">NASA Blue Marble source</a></p>
+<p>Made with Natural Earth, 1:10m Admin‑1 boundaries with large lakes removed from the land polygons. The generalized map is intended for regional screening.</p>
+<p><a href="https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-1-states-provinces/">Natural Earth boundary source</a></p>
 </main></body></html>

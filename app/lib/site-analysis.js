@@ -88,7 +88,7 @@ export function comparableScores(a, b) {
       meta?.scenario_period ?? null,
       ...factorDefinitions.map(({ key }) => weights[key]),
       [...(ranking.data_quality?.ranking_metrics_used ?? [])].sort(),
-      ranking.extra_metrics?.wind_source_used ?? 'merra2',
+      ranking.extra_metrics?.wind_source_used ?? 'gwa',
     ]);
   };
   return signature(a) === signature(b);

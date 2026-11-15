@@ -1,7 +1,5 @@
 # DataX
 
-> Full project documentation (Quick Start, User Guide, Data & Methodology, API, Build): see [docs/DATAX_DOCUMENTATION.md](docs/DATAX_DOCUMENTATION.md).
-
 A React and Next.js app for screening potential data center locations in Finland. The opening reuses the approved real-time Three.js Earth scene: approximately 7.67 seconds from complete darkness through stationary isolated lights, a growing city network and a night-to-day turn under fixed lighting. Earth first appears in the center with no selection UI, then an ivory landing panel with black “Choose a country” text and a search field slides in from the left, narrowing the space viewport and moving Earth right. Selecting Finland starts an orbital approach, smoothly centering the globe. The camera approaches the existing cloud cover over 5 seconds and crosses it over 3 seconds, using the approved `/lab/approach` effect. The interactive map prepares behind the scene during the opening and is revealed through the clearing clouds with national and regional borders. Select a point inside Finland or select a reference marker. On desktop, the country shifts left and a single analysis panel opens on the right. On smaller screens, the panel appears below the map.
 
 ## Run on localhost

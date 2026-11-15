@@ -470,8 +470,6 @@ export async function fetchWaterPrecision(lat, lon, signal) {
             }
         }
         if (maxDischarge === null) {
-            const localWater = await fallbackWaterFromLocalOsm(lat, lon);
-            if (localWater) return localWater;
             return {
                 waterDistanceKm: null,
                 waterDischargeM3s: null,
@@ -489,8 +487,6 @@ export async function fetchWaterPrecision(lat, lon, signal) {
             source: 'Copernicus GloFAS v4 & Copernicus DEM GLO-90 49-pt stencil'
         };
     } catch  {
-        const localWater = await fallbackWaterFromLocalOsm(lat, lon);
-        if (localWater) return localWater;
         return {
             waterDistanceKm: null,
             waterDischargeM3s: null,
@@ -499,67 +495,6 @@ export async function fetchWaterPrecision(lat, lon, signal) {
             source: 'Water service unavailable'
         };
     }
-}
-
-const LOCAL_WATER_FALLBACKS = [
-    {
-        name: 'Canada (OSM Overpass)',
-        match: (lat, lon) => lon < -40,
-        load: loadCanadaWaterIndex,
-        waterMethod: 'osm_overpass_local',
-        source: 'OpenStreetMap Overpass hydrography (Canada)',
-    },
-    {
-        name: 'Finland (SYKE Ranta10)',
-        match: (lat, lon) => lon >= 15 && lon <= 35 && lat >= 58,
-        load: loadFinlandWaterIndex,
-        waterMethod: 'syke_ranta10_local',
-        source: 'SYKE Ranta10 hydrography (Finland)',
-    },
-];
-let canadaWaterPromise = null;
-
-function loadCanadaWaterIndex() {
-    if (!canadaWaterPromise) {
-        canadaWaterPromise = (async () => {
-            try {
-                const raw = await readFile(path.join(process.cwd(), 'server', 'v6', 'data', 'canada', 'canada-water.json'), 'utf-8');
-                const parsed = JSON.parse(raw);
-                return Array.isArray(parsed.points) && parsed.points.length > 0 ? parsed : null;
-            } catch {
-                return null;
-            }
-        })();
-    }
-    return canadaWaterPromise;
-}
-
-async function fallbackWaterFromLocalOsm(lat, lon) {
-    for (const region of LOCAL_WATER_FALLBACKS) {
-        if (!region.match(lat, lon)) continue;
-        const index = await region.load();
-        const pts = index?.points;
-        if (!pts || pts.length === 0) continue;
-        let minDist = Infinity;
-        let nearestCode = 1;
-        for (let i = 0; i < pts.length; i++) {
-            const p = pts[i];
-            const d = haversineKm(lat, lon, p[0], p[1]);
-            if (d < minDist) {
-                minDist = d;
-                nearestCode = p[2];
-            }
-        }
-        return {
-            waterDistanceKm: Math.min(20, round(minDist, 2)),
-            waterDischargeM3s: null,
-            waterBodyType: nearestCode === 0 ? 'sea' : nearestCode === 2 ? 'river' : 'lake',
-            waterMethod: region.waterMethod,
-            status: 'measured',
-            source: region.source,
-        };
-    }
-    return null;
 }
 function normalCdf(z) {
     const t = 1 / (1 + 0.2316419 * Math.abs(z));
@@ -662,13 +597,14 @@ export async function analyzeExactPoint({ lat, lon, startYear = 2005, endYear = 
     if (cached) return cached;
     let rawInputs = nasaCoarseCache.get(coordKey);
     if (!rawInputs) {
-        const [params, terrain, water, hydroIndex] = await Promise.all([
+        const [params, gwaRes, terrain, water, hydroIndex] = await Promise.all([
             fetchNasaPowerMonthly(lat, lon, signal).then(data => data.parameters),
+            fetchGwa100mWithRetry(lat, lon, signal),
             fetchTerrainStencil(lat, lon, signal),
             fetchWaterPrecision(lat, lon, signal),
             loadFinlandWaterIndex()
         ]);
-        rawInputs = { params, gwaRes: null, terrain, water, hydroIndex };
+        rawInputs = { params, gwaRes, terrain, water, hydroIndex };
         pruneMap(nasaCoarseCache, MAX_CACHE_ENTRIES);
         nasaCoarseCache.set(coordKey, rawInputs);
     }

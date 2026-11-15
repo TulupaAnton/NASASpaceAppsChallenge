@@ -4,69 +4,28 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a1411">
-  <title>Data &amp; sources — DataX</title>
+  <title>Data &amp; sources — Earth to Finland</title>
   <link rel="icon" href="assets/terra-icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="data-package.css">
-  <style>
-    .source-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 16px; }
-    .source-card { border: 1px solid #304436; border-radius: 10px; background: #111e17; padding: 14px 16px; }
-    .source-card h3 { margin: 0 0 6px; font-size: 1rem; color: #f2f0df; }
-    .source-card p { margin: 0 0 10px; font-size: .86rem; line-height: 1.5; }
-    .source-card a { font-size: .85rem; color: #acf3cd; }
-  </style>
 </head>
 <body>
   <main>
-    <nav aria-label="Site">
-      <a href="/">← Back to map</a>
-      <div style="display:flex;gap:16px">
-        <a href="/canada/sources.html">Canada data &amp; sources</a>
-        <a href="credits.html">Map credits</a>
-      </div>
-    </nav>
+    <nav aria-label="Site"><a href="/">← Finland map</a><a href="credits.html">Map credits</a></nav>
     <header>
       <h1>Data &amp; sources</h1>
-      <p>DataX evaluates data-center siting candidates across Finland and Canada using a unified, transparent physical screening model and open Earth observation datasets.</p>
+      <p>The screening results use the updated Finland datasets and the supplied three-part ranking model. The assembled Finland pipeline includes the datasets and the source used in this frontend.</p>
       <div class="downloads">
         <a href="downloads/finland-pipeline.zip" download>Assembled Finland pipeline</a>
-        <a href="data/history/finland_all_regions_monthly.csv" download>Monthly CSV</a>
-        <a href="data/history/finland_all_regions_annual.csv" download>Annual CSV</a>
       </div>
     </header>
-    <section aria-labelledby="methodology">
-      <h2 id="methodology">Unified screening methodology</h2>
-      <p>All regions and live coordinates share fixed screening weights: <strong>25%</strong> climate and cooling demand, <strong>60%</strong> solar and wind renewable potential, and <strong>15%</strong> modeled water indicators. Because both Finland and Canada use NASA POWER MERRA-2 wind estimates and physical thresholds, scores can be compared directly across countries.</p>
-      <p>Regional rankings compare 19 Finnish reference sites and 13 Canadian reference sites. Screening scores support early-stage siting; final project decisions also require grid capacity, permitting, fiber connectivity, and local water-rights verification.</p>
-    </section>
-    <section aria-labelledby="sources">
-      <h2 id="sources">Primary data sources</h2>
-      <div class="source-list">
-        <article class="source-card">
-          <h3>NASA POWER (MERRA-2 &amp; CERES)</h3>
-          <p>Monthly 1984–2024 air temperature, solar irradiation, and 100 m wind estimates, plus seasonal trend projections (2025–2034).</p>
-          <a href="https://power.larc.nasa.gov/docs/services/api/temporal/monthly/">NASA POWER Monthly API →</a>
-        </article>
-        <article class="source-card">
-          <h3>NASA Blue Marble Next Generation</h3>
-          <p>High-resolution global Earth imagery powering the 3D globe opening and country satellite basemaps.</p>
-          <a href="https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/">NASA Earth Observatory →</a>
-        </article>
-        <article class="source-card">
-          <h3>Copernicus GloFAS v4 &amp; DEM GLO-90</h3>
-          <p>River discharge estimates, coastal/sea detection, elevation, and terrain slope via Open-Meteo Flood &amp; Elevation APIs.</p>
-          <a href="https://open-meteo.com/en/docs/flood-api">Flood API →</a> ·
-          <a href="https://open-meteo.com/en/docs/elevation-api">Elevation API →</a>
-        </article>
-        <article class="source-card">
-          <h3>SYKE Ranta10 &amp; OpenStreetMap Overpass</h3>
-          <p>38,011 coastal, lake, and river reference points across Finland (SYKE) and 162,397 water features across Canada (OSM) for local hydrography proximity.</p>
-          <a href="https://overpass-api.de/">Overpass API →</a>
-        </article>
-        <article class="source-card">
-          <h3>Statistics Finland</h3>
-          <p>2026 regional administrative boundaries at 1:1,000,000 scale for regional selection and geometry.</p>
-          <a href="https://stat.fi/en/services/statistical-data-services/geographic-data/statistical-areas/municipality-based-statistical-units">Statistics Finland →</a>
-        </article>
+    <section aria-labelledby="current">
+      <h2 id="current">Current integration</h2>
+      <p>The current model weighs climate and cooling (25%), renewable energy (60%), and water resources (15%). The data come from NASA POWER, DTU Global Wind Atlas, Copernicus DEM, and GloFAS. The water indicators estimate nearby sources and streamflow.</p>
+      <p>Regional scores compare 19 reference sites. The map uses a region’s reference site when an exact point analysis is unavailable. The score supports site screening. A project decision also needs confirmation of grid capacity, water access, network connectivity, and permitting.</p>
+      <div class="downloads">
+        <a href="downloads/AGENT_FRONTEND_GUIDE.md" download>Frontend integration guide</a>
+        <a href="data/history/finland_all_regions_monthly.csv" download>Monthly data</a>
+        <a href="data/history/finland_all_regions_annual.csv" download>Annual data</a>
       </div>
     </section>
   </main>

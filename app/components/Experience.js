@@ -136,7 +136,7 @@ export default function Experience({ onLocationSelected } = {}) {
 
   useEffect(() => {
     view.current?.setContext(shortlist);
-  }, [phase, shortlist, countryId]);
+  }, [phase, shortlist]);
 
   function addSite(site) {
     setShortlist(current => current.length < 3 && !current.some(candidate => selectionKey(candidate) === selectionKey(site))
