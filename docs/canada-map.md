@@ -66,6 +66,11 @@ it must not be reused as a Finnish identifier.
   `PLAYWRIGHT_MODULE` to an installed Playwright module if needed. It checks the
   first-paint gate, optional delayed loading (`SLOW_MAP=1`), Canadian analysis,
   switching to Mongolia and Finland, water report APIs and Replay.
+- `tests/browser/switch-picking.mjs` performs arbitrary pointer picks through
+  Finland → Mongolia → Canada → Finland with the switch animation enabled.
+  It derives screen targets from actual Canvas2D drawing and checks the emitted
+  geographic coordinates. Exact-point provider requests are mocked in this
+  interaction test so provider quotas cannot mask a picking regression.
 - The browser test suppresses native WebGL draws to isolate map stalls from
   headless SwiftShader cost. Shader compilation, camera clocks and Canvas2D
   drawing still run. It takes no screenshots or visual assertions.

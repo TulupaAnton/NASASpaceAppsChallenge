@@ -56,9 +56,10 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
   }
 
   function resize() {
-    const bounds = canvas.getBoundingClientRect();
-    if (bounds.width < 1 || bounds.height < 1) return;
-    const { width, height } = bounds;
+    // Layout dimensions stay stable while the country-switch animation scales
+    // the canvas. A transformed bounding rectangle must not resize its bitmap.
+    const width = canvas.clientWidth, height = canvas.clientHeight;
+    if (width < 1 || height < 1) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (size?.width === width && size.height === height && size.dpr === dpr) return;
     const previous = size;
@@ -339,7 +340,10 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
 
   function relative(event) {
     const rect = canvas.getBoundingClientRect();
-    return [event.clientX - rect.left, event.clientY - rect.top];
+    return [
+      (event.clientX - rect.left) * size.width / (rect.width || size.width),
+      (event.clientY - rect.top) * size.height / (rect.height || size.height),
+    ];
   }
 
   function locate([x, y], tolerance) {

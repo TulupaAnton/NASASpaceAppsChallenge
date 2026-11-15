@@ -43,7 +43,7 @@ for (const code of ['ca', 'mn']) test(`${code}: artwork, projection and selectio
   }
   let pose = {}, queue = new Map(), now = 0, id = 0;
   const handlers = {}, ctx = context2D((x, y) => { pose = { x, y }; });
-  const canvas = { style: {}, getContext: () => ctx, getBoundingClientRect: () => ({ width: 1600, height: 900, left: 0, top: 0 }),
+  const canvas = { style: {}, clientWidth: 1600, clientHeight: 900, getContext: () => ctx, getBoundingClientRect: () => ({ width: 1600, height: 900, left: 0, top: 0 }),
     addEventListener: (name, fn) => { handlers[name] = fn; }, removeEventListener() {}, setPointerCapture() {} };
   const context = { IMAGE_WIDTH: 1280, IMAGE_HEIGHT: 720, comparisonColors: [], selection,
     unproject() { throw new Error('The merged map must use its own inverse projection'); },

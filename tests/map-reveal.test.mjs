@@ -27,7 +27,7 @@ test('full-screen reveal adds black edges continuously as the photo retracts', (
   };
   const ctx = new Proxy({}, {get:(_,key)=>key in methods ? methods[key] : key in state ? state[key] : ()=>{}, set:(_,key,value)=>{state[key]=value;return true;}});
   const width=1854,height=927;
-  const canvas={style:{},getContext:()=>ctx,getBoundingClientRect:()=>({width,height}),addEventListener(){},removeEventListener(){}};
+  const canvas={style:{},clientWidth:width,clientHeight:height,getContext:()=>ctx,getBoundingClientRect:()=>({width,height}),addEventListener(){},removeEventListener(){}};
   const context={IMAGE_WIDTH,IMAGE_HEIGHT,project,unproject(){},sites:[],comparisonColors:[],selection(){},selectionKey(){},destination(){},
    window:{devicePixelRatio:1},performance:{now:()=>now},ResizeObserver:class {observe(){} disconnect(){}},
    requestAnimationFrame:callback=>{queue.set(++id,callback);return id;},cancelAnimationFrame:key=>queue.delete(key)};
