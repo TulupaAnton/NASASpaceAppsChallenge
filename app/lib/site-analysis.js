@@ -82,6 +82,7 @@ export function comparableScores(a, b) {
   const signature = ({ ranking, meta }) => {
     const weights = ranking.insight?.effective_weights ?? meta?.weights ?? {};
     return JSON.stringify([
+      meta?.country ?? 'fi',
       meta?.scoring_mode,
       meta?.historical_period ?? null,
       meta?.scenario_period ?? null,

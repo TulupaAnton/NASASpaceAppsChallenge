@@ -40,7 +40,7 @@ The default port is 3000. Set `PORT` to override it. For remote development, set
 2. **Choose a site.** Select a city marker for a bundled regional sample, or select a point within the mapped land boundary to analyze those coordinates. Scroll, pinch, or use **+** and **−** to zoom. With the map focused, the arrow keys move the cursor, **Enter** selects a point, and **Home** fits the country to the viewport.
 3. **Read the report.** In **Site**, check the screening score and its factor contributions. Open **Measurements and charts** for annual air temperature and monthly solar and wind charts. Open **Method & statistics** for the trend, confidence interval, p-values, and score weights.
 4. **Change the period.** Open **Data period** and choose **Change dates**. Select a historical window and projection length, then choose **Apply dates**. To return to the bundled period, choose **Use default dates**, then **Apply dates**.
-5. **Compare sites.** Choose **Add to comparison** on two or three sites (within the same country or across Finland and Canada), then open **Compare**. The first site is the baseline (A). Switching countries preserves the comparison list.
+5. **Compare sites.** Choose **Add to comparison** on two or three sites in the same country, then open **Compare**. The first site is the baseline (A). The selected dates apply to all sites, and switching countries clears the list.
 
 | Report label | What it represents |
 | --- | --- |
@@ -50,7 +50,7 @@ The default port is 3000. Set `PORT` to override it. For remote development, set
 
 The default record is **2005–2024** and the default projection is **2025–2034**. The historical presets are 2005–2024, 2015–2024, and 1984–2024. A custom historical period must span at least three calendar years within 1984–2024. The interface offers projection lengths of 5, 10, 15, or 20 years.
 
-The comparison shows score differences when the reports have complete scores and share the historical period, projection period, scoring mode, weights, active indicators, and wind data source (`merra2`). Other pairs can still show available measurements and charts. **Data & sources** and **Map credits** provide attribution. Finland also has downloadable CSVs and a pipeline archive.
+The comparison shows score differences when the reports have complete scores and share the country, historical period, projection period, scoring mode, weights, active indicators, and wind data source (`merra2`). Other pairs can still show available measurements and charts. **Data & sources** and **Map credits** provide attribution. Finland also has downloadable CSVs and a pipeline archive.
 
 ## 3. Data and methodology
 

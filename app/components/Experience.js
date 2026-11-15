@@ -219,6 +219,7 @@ export default function Experience({ onLocationSelected } = {}) {
       activeCountry.current = id;
       setCountryId(id);
       setSelected(null);
+      setShortlist([]);
       window.scrollTo(0, 0);
       const nextView = replaceMap(assets);
       nextView.enter(true);
