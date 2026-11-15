@@ -1,0 +1,106 @@
+{
+  "BC": {
+    "waterDistanceKm": 0,
+    "waterDischargeM3s": 807.47,
+    "waterBodyType": "river",
+    "waterMethod": "glofas_49pt_stencil",
+    "status": "measured",
+    "source": "Copernicus GloFAS v4 & Copernicus DEM GLO-90 49-pt stencil"
+  },
+  "AB": {
+    "waterDistanceKm": 0.5,
+    "waterDischargeM3s": 124.73,
+    "waterBodyType": "river",
+    "waterMethod": "glofas_49pt_stencil",
+    "status": "measured",
+    "source": "Copernicus GloFAS v4 & Copernicus DEM GLO-90 49-pt stencil"
+  },
+  "SK": {
+    "waterDistanceKm": 0,
+    "waterDischargeM3s": 152.46,
+    "waterBodyType": "river",
+    "waterMethod": "glofas_49pt_stencil",
+    "status": "measured",
+    "source": "Copernicus GloFAS v4 & Copernicus DEM GLO-90 49-pt stencil"
+  },
+  "MB": {
+    "waterDistanceKm": 1.5,
+    "waterDischargeM3s": 256.14,
+    "waterBodyType": "river",
+    "waterMethod": "glofas_49pt_stencil",
+    "status": "measured",
+    "source": "Copernicus GloFAS v4 & Copernicus DEM GLO-90 49-pt stencil"
+  },
+  "ON": {
+    "waterDistanceKm": 0,
+    "waterDischargeM3s": 12.79,
+    "waterBodyType": "river",
+    "waterMethod": "glofas_49pt_stencil",
+    "status": "measured",
+    "source": "Copernicus GloFAS v4 & Copernicus DEM GLO-90 49-pt stencil"
+  },
+  "QC": {
+    "waterDistanceKm": 0,
+    "waterDischargeM3s": 9776.17,
+    "waterBodyType": "river",
+    "waterMethod": "glofas_49pt_stencil",
+    "status": "measured",
+    "source": "Copernicus GloFAS v4 & Copernicus DEM GLO-90 49-pt stencil"
+  },
+  "NB": {
+    "waterDistanceKm": 0,
+    "waterDischargeM3s": 319.53,
+    "waterBodyType": "river",
+    "waterMethod": "glofas_49pt_stencil",
+    "status": "measured",
+    "source": "Copernicus GloFAS v4 & Copernicus DEM GLO-90 49-pt stencil"
+  },
+  "NS": {
+    "waterDistanceKm": 0,
+    "waterDischargeM3s": 7.5,
+    "waterBodyType": "river",
+    "waterMethod": "glofas_49pt_stencil",
+    "status": "measured",
+    "source": "Copernicus GloFAS v4 & Copernicus DEM GLO-90 49-pt stencil"
+  },
+  "PE": {
+    "waterDistanceKm": 1.5,
+    "waterDischargeM3s": 3.62,
+    "waterBodyType": "river",
+    "waterMethod": "glofas_49pt_stencil",
+    "status": "measured",
+    "source": "Copernicus GloFAS v4 & Copernicus DEM GLO-90 49-pt stencil"
+  },
+  "NL": {
+    "waterDistanceKm": 0,
+    "waterDischargeM3s": 2.06,
+    "waterBodyType": "river",
+    "waterMethod": "glofas_49pt_stencil",
+    "status": "measured",
+    "source": "Copernicus GloFAS v4 & Copernicus DEM GLO-90 49-pt stencil"
+  },
+  "YT": {
+    "waterDistanceKm": 0,
+    "waterDischargeM3s": 295.15,
+    "waterBodyType": "river",
+    "waterMethod": "glofas_49pt_stencil",
+    "status": "measured",
+    "source": "Copernicus GloFAS v4 & Copernicus DEM GLO-90 49-pt stencil"
+  },
+  "NT": {
+    "waterDistanceKm": 0,
+    "waterDischargeM3s": 53.15,
+    "waterBodyType": "river",
+    "waterMethod": "glofas_49pt_stencil",
+    "status": "measured",
+    "source": "Copernicus GloFAS v4 & Copernicus DEM GLO-90 49-pt stencil"
+  },
+  "NU": {
+    "waterDistanceKm": 6,
+    "waterDischargeM3s": 0.73,
+    "waterBodyType": "river",
+    "waterMethod": "glofas_49pt_stencil",
+    "status": "measured",
+    "source": "Copernicus GloFAS v4 & Copernicus DEM GLO-90 49-pt stencil"
+  }
+}

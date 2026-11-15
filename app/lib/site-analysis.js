@@ -51,7 +51,7 @@ export function normalizeAnalysis(report, site) {
       total: report.partial ? null : numeric(row.scores?.overall),
       rank,
       ofTotal: rank === null ? null : report.count,
-      factors: factorDefinitions.filter(({ key }) => (meta?.country !== 'ca' && meta?.country !== 'mn') || key !== 'water').map(({ key, label }) => {
+      factors: factorDefinitions.map(({ key, label }) => {
         const score = numeric(row.scores?.[key]);
         const weight = numeric(weights?.[key]);
         const contribution = numeric(row.score_contributions?.[key]) ??

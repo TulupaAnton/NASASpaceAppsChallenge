@@ -236,13 +236,12 @@ function Energy({ report, analysis }) {
 
 function Method({ analysis, report, legacy }) {
   const { trend } = analysis;
-  const noWater = report.meta?.country === 'ca' || report.meta?.country === 'mn';
+  const hasMappedHydro = report.meta?.country !== 'ca' && report.meta?.country !== 'mn';
   const countryName = countries[report.meta?.country]?.name ?? 'Country';
   const years = period => period?.length === 2 ? period[0].slice(0, 4) + '–' + period[1].slice(0, 4) : unknown;
 
   return <Disclosure label="Method & statistics">
-    <p>{noWater ? 'The screening score weighs outdoor cooling climate (30%) and renewable resources (70%). Water is outside the scope of this dataset.'
-      : 'The screening score weighs outdoor cooling climate, renewable resources, and modeled water indicators. A build decision also depends on grid capacity, fiber connectivity, land, and permits.'}</p>
+    <p>The screening score weighs outdoor cooling climate, renewable resources, and modeled water indicators. A build decision also depends on grid capacity, fiber connectivity, land, and permits.</p>
     <dl className="method-grid">
       <div><dt>Historical record</dt><dd>{years(report.meta?.historical_period)}</dd></div>
       <div><dt>Scenario period</dt><dd>{years(report.meta?.scenario_period)}</dd></div>
@@ -251,16 +250,16 @@ function Method({ analysis, report, legacy }) {
       <div><dt>Unadjusted test</dt><dd>{probabilityText(trend.pValue)}</dd></div>
       <div><dt>FDR-adjusted test</dt><dd>{probabilityText(trend.pAdjusted)}</dd></div>
       <div><dt>Trend result at 5%</dt><dd>{significanceText(trend.isSignificant)}{trend.significanceBasis && (trend.significanceBasis === 'fdr' ? ' · Adjusted across regions' : ' · Single-site test')}</dd></div>
-      {!noWater && <div><dt>Mapped water sample</dt><dd>{analysis.metrics[4].displayValue}</dd></div>}
+      {hasMappedHydro && <div><dt>Mapped water sample</dt><dd>{analysis.metrics[4].displayValue}</dd></div>}
     </dl>
-    {!noWater && <p>The mapped sample is a separate reference layer. The score uses modeled water proximity and flow. Neither distance establishes water access for a project.</p>}
+    {hasMappedHydro && <p>The mapped sample is a separate reference layer. The score uses modeled water proximity and flow. Neither distance establishes water access for a project.</p>}
     <table className="method-table">
       <thead><tr><th scope="col">Factor</th><th scope="col">Score / 100</th><th scope="col">Weight</th><th scope="col">Points</th></tr></thead>
       <tbody>{analysis.score.factors.map(factor => <tr key={factor.key}>
         <th scope="row">{factor.label}</th><td>{valueText(factor.score)}</td><td>{percentText(factor.weight)}</td><td>{valueText(factor.contribution)}</td>
       </tr>)}</tbody>
     </table>
-    <a className="text-button" href={legacy}>{noWater ? `${countryName} data & sources` : 'Regional report & CSV downloads'} <Icon name="upRight" /></a>
+    <a className="text-button" href={legacy}>{hasMappedHydro ? 'Regional report & CSV downloads' : `${countryName} data & sources`} <Icon name="upRight" /></a>
   </Disclosure>;
 }
 
@@ -338,10 +337,10 @@ export default function Analysis({ site, onChooseSite, shortlist, onAdd, onRemov
       <Disclosure label="Measurements and charts">
         <Temperature report={report} analysis={analysis} />
         <Energy report={report} analysis={analysis} />
-        {!nonLegacyCountry && <section className="detail-section">
+        <section className="detail-section">
           <h3>Modeled water proximity</h3>
           <p>{analysis.metrics[3].displayValue}</p>
-        </section>}
+        </section>
       </Disclosure>
       <Method analysis={analysis} report={report} legacy={legacy} />
     </>}

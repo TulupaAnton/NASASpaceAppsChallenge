@@ -403,7 +403,7 @@ async function fetchGlofasDischargeBatch(coords, signal) {
         return vals.reduce((a, b)=>a + b, 0) / vals.length;
     });
 }
-async function fetchWaterPrecision(lat, lon, signal) {
+export async function fetchWaterPrecision(lat, lon, signal) {
     const ringsKm = [
         0.5,
         1.5,

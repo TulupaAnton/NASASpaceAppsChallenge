@@ -2,14 +2,12 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import sites from '../../public/mongolia/sites.json' with { type: 'json' };
 import snapshots from './data/mongolia/power.json' with { type: 'json' };
+import waterSnapshots from './data/mongolia/water.json' with { type: 'json' };
 import { mongoliaSiteId } from '../../app/lib/countries.js';
 import { collectRegions, findRegion } from '../../public/legacy/projection.js';
-import { buildPointReport, fetchNasaPowerMonthly } from './exact-point.js';
+import { buildPointReport, fetchNasaPowerMonthly, fetchWaterPrecision } from './exact-point.js';
 
-const water = {
-  waterDistanceKm: null, waterDischargeM3s: null, waterMethod: 'unavailable',
-  status: 'unavailable', source: 'Water screening is outside the scope of the Mongolia dataset',
-};
+const waterCache = new Map();
 
 let regions;
 export async function coordinateInMongolia(lat, lon) {
@@ -22,16 +20,14 @@ export async function coordinateInMongolia(lat, lon) {
   return Boolean(findRegion(await regions, lon, lat));
 }
 
-function mongoliaPoint({ parameters, elevationM, ...location }) {
+function mongoliaPoint({ parameters, elevationM, water, ...location }) {
   if (!Number.isFinite(elevationM)) throw new Error('NASA POWER grid elevation is unavailable.');
   const result = buildPointReport({
     ...location, params: parameters, requireComplete: true, water,
     terrain: { elevationM, slopeDeg: null, source: 'NASA POWER grid elevation, used for air density correction' },
   });
-  result.partial = false;
   result.meta.country = 'mn';
-  result.meta.score_type = 'Mongolia climate and renewable energy screening score';
-  result.point_ranking.data_quality.water_excluded_from_model = true;
+  result.meta.score_type = 'Mongolia climate, renewable energy, and water screening score';
   return result;
 }
 
@@ -44,7 +40,7 @@ function referenceReports() {
     if (snapshot?.point[0] !== lon || snapshot.point[1] !== lat) {
       throw new Error(`Missing or mismatched Mongolia reference for ${site.code}`);
     }
-    const raw = mongoliaPoint({ lat, lon, ...snapshot });
+    const raw = mongoliaPoint({ lat, lon, water: waterSnapshots[site.code], ...snapshot });
     return {
       mode: 'region', partial: false, count: sites.length, chart: raw.point_charts, hydro: null,
       region: { name: site.region, hub_city: site.name },
@@ -66,6 +62,18 @@ export function mongoliaRegionReport(id) {
 }
 
 export async function analyzeMongoliaPoint({ lat, lon, startYear, endYear, horizonYears, signal }) {
-  const data = await fetchNasaPowerMonthly(lat, lon, signal, startYear, endYear);
-  return mongoliaPoint({ lat, lon, startYear, endYear, horizonYears, ...data });
+  const coordKey = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+  const cachedWater = waterCache.get(coordKey);
+  const [data, water] = await Promise.all([
+    fetchNasaPowerMonthly(lat, lon, signal, startYear, endYear),
+    cachedWater ? Promise.resolve(cachedWater) : fetchWaterPrecision(lat, lon, signal),
+  ]);
+  if (!cachedWater && water.status === 'measured') {
+    if (waterCache.size >= 200) {
+      const firstKey = waterCache.keys().next().value;
+      if (firstKey !== undefined) waterCache.delete(firstKey);
+    }
+    waterCache.set(coordKey, water);
+  }
+  return mongoliaPoint({ lat, lon, startYear, endYear, horizonYears, water, ...data });
 }
