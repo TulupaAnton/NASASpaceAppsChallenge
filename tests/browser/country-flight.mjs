@@ -1,6 +1,7 @@
 // Run with PLAYWRIGHT_MODULE pointing to an installed Playwright module, or
 // install Playwright locally. No screenshots or visual assertions are used.
 import assert from 'node:assert/strict';
+import { countrySites } from '../../app/lib/sites.js';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', headless: true,
   args: ['--enable-unsafe-swiftshader'] });
@@ -32,6 +33,10 @@ try {
     };
     const draw = CanvasRenderingContext2D.prototype.drawImage;
     CanvasRenderingContext2D.prototype.drawImage = function (...args) {
+      if (this.canvas.matches?.('canvas.map')) {
+        const { a, e, f } = this.getTransform();
+        window.flightProbe.mapPose = { k: a, x: e, y: f };
+      }
       if (this.canvas.matches?.('canvas.map') && !window.flightProbe.painted) {
         window.flightProbe.painted = true;
         window.flightProbe.firstPaintStage = document.querySelector('.earth-opening')?.dataset.introStage;
@@ -80,8 +85,19 @@ try {
   });
   console.log(JSON.stringify({ flightTasksOver100ms: flightTasks }));
   assert.equal(flightTasks.length, 0, 'Map preparation must not block the active flight');
-  await page.getByLabel('Choose a reference site', { exact: true }).selectOption({ label: 'Edmonton' });
+  assert.equal(await page.locator('.footer select').count(), 0);
+  await page.waitForTimeout(1000);
+  const reference = countrySites.ca.find(site => site.name === 'Edmonton');
+  const target = await page.evaluate(([x, y]) => {
+    const canvas = document.querySelector('canvas.map'), rect = canvas.getBoundingClientRect();
+    const { x: tx, y: ty, k } = window.flightProbe.mapPose;
+    return { x: rect.left + (tx + x * k) * rect.width / canvas.width,
+      y: rect.top + (ty + y * k) * rect.height / canvas.height };
+  }, reference.xy);
+  await page.mouse.click(target.x, target.y);
   await page.locator('.analysis-panel .score-overview').waitFor();
+  assert.equal(await page.locator('.footer select').count(), 0);
+  assert.match(await page.locator('.analysis-panel').innerText(), /Edmonton/);
   assert.match(await page.locator('.analysis-panel').innerText(), /Canada/);
   const canadaResponse = await page.request.get(new URL('/api/regions/ca_ab', page.url()).href);
   assert.equal(canadaResponse.status(), 200);
@@ -95,6 +111,7 @@ try {
   assert.deepEqual(await countries.getByRole('button').allTextContents(), ['Finland', 'Canada']);
   await countries.getByRole('button', { name: 'Finland', exact: true }).click();
   await page.waitForSelector('main[data-country="FI"][data-view="map"][data-switching="false"]');
+  assert.equal(await page.locator('.footer select').count(), 0);
   assert.deepEqual(errors, []);
   // Replaying must restore the original Finland route as well.
   await page.getByRole('button', { name: 'Replay intro', exact: true }).click();
@@ -102,7 +119,7 @@ try {
   await page.locator('#country-search').fill('Finland');
   await page.getByRole('button', { name: 'Finland', exact: true }).click();
   await page.waitForSelector('main[data-country="FI"][data-view="map"]', { timeout: 30000 });
-  assert.equal(await page.getByLabel('Choose a reference site', { exact: true }).count(), 1);
+  assert.equal(await page.locator('.footer select').count(), 0);
   assert.deepEqual(errors, []);
 } finally {
   await browser.close();

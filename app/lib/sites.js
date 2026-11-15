@@ -18,9 +18,6 @@ const finlandSites = finlandReferences.map(site => ({ ...site, siteId: site.site
 export const countrySites = Object.fromEntries(Object.entries({ fi: finlandSites, ca: canadaSites }).map(([id, references]) => [
   id, references.map((site, index) => ({ ...site, index, xy: countries[id].project(...site.point) })),
 ]));
-export const countrySiteOptions = Object.fromEntries(Object.entries(countrySites).map(([id, sites]) => [
-  id, [...sites].sort((a, b) => a.name.localeCompare(b.name)),
-]));
 
 export function selection(point, region, site, country = 'fi') {
   const [longitude, latitude] = point;

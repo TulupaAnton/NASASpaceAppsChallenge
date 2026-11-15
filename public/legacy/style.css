@@ -67,7 +67,7 @@ body { margin: 0; overflow: hidden; }
 .center-play:hover { background: #243832; }
 .center-play svg { width: 25px; height: 25px; }
 
-.center-play:focus-visible, .map:focus-visible, .source-link:focus-visible, .map-information a:focus-visible, .map-information select:focus-visible {
+.center-play:focus-visible, .map:focus-visible, .source-link:focus-visible, .map-information a:focus-visible {
   outline: 2px solid #ffe3a4;
   outline-offset: 4px;
 }
@@ -110,9 +110,6 @@ body { margin: 0; overflow: hidden; }
   font-size: 11px;
 }
 
-.map-information label { display: inline-flex; align-items: center; }
-.map-information i { width: 6px; height: 6px; border-radius: 50%; background: #ffe1a0; }
-.map-information select { color: #f2f0e3; background: #101b17; border: 1px solid #8a9a78; border-radius: 4px; max-width: 155px; padding: 2px 3px; font: inherit; }
 .map-information a { color: #d4dacc; text-underline-offset: 2px; }
 #experience[data-phase="flight"] .map-information { display: none; }
 

@@ -37,12 +37,12 @@ approach retains the previously tested existing cloud texel at 102° W, 56° N.
 
 The remote header country switcher and map transition are retained. Switching
 clears the analyzed site and comparison list, and binds the new country's
-reference picker and analysis panel. Replay restores the opening flow.
+reference markers and analysis panel. Replay restores the opening flow.
 
 ## Analysis
 
 `countrySites` and `selection` in `app/lib/sites.js` provide reference IDs and
-country identity to both map picks and the reference menu. The panel reads the
+country identity to map picks and reference markers. The panel reads the
 remote `server/v6/canada.js` reports via the regional API alongside Finland's catalog.
 Exact-coordinate requests include `country`, historical years and horizon.
 Bundled reference water inputs and live water-provider hooks come from the

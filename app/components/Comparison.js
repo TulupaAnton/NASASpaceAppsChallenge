@@ -191,7 +191,7 @@ export default function Comparison({ candidates, remove, leader, onChooseSite, t
   return <>
     <section className="card compare-controls">
       <div className="chart-heading"><h2>Compare locations</h2><span className="scope-title">{count} / 3 · {timeRange.startYear}–{timeRange.endYear} (+{timeRange.horizonYears}y)</span></div>
-      <p className="chart-note">Select locations on the map or use the site menu, then choose Add to comparison.</p>
+      <p className="chart-note">Select locations on the map, then choose Add to comparison.</p>
       {leader && count < 3 && !candidates.some(site => site.siteId === leader.site_id) && (
         <button type="button" className="text-button compare-benchmark" onClick={() => onChooseSite(leader.site_id)}>
           Select regional benchmark · {leader.region?.split(' (')[0]} {valueText(leader.scores?.overall)} / 100

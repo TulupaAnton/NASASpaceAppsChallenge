@@ -280,18 +280,6 @@ export default function Analysis({ site, onChooseSite, shortlist, onAdd, onRemov
 
   useEffect(() => { if (panel.current) panel.current.scrollTop = 0; }, [site, tab]);
   useEffect(() => {
-    const node = panel.current;
-    const footer = node?.parentElement?.querySelector('.footer');
-    if (!footer) return;
-    function fitFooter() {
-      node.style.setProperty('--analysis-footer-height', footer.offsetHeight + 'px');
-    }
-    const observer = new ResizeObserver(fitFooter);
-    fitFooter();
-    observer.observe(footer);
-    return () => observer.disconnect();
-  }, []);
-  useEffect(() => {
     const controller = new AbortController();
     const { signal } = controller;
     getAnalysisReport(site, exact, signal, timeRange).then(

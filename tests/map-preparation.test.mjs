@@ -4,13 +4,13 @@ import vm from 'node:vm';
 import test from 'node:test';
 import { countries, getCountry } from '../app/lib/countries.js';
 import { createMapProjection } from '../app/lib/map-projections.js';
-import { countrySiteOptions, countrySites, selection } from '../app/lib/sites.js';
+import { countrySites, selection } from '../app/lib/sites.js';
 import { collectRegions, findRegion } from '../public/legacy/projection.js';
 const root = new URL('../', import.meta.url);
 
 test('country configuration and reference catalogs contain only Finland and Canada', () => {
   const supported = ['ca', 'fi'];
-  for (const catalog of [countries, countrySites, countrySiteOptions]) {
+  for (const catalog of [countries, countrySites]) {
     assert.deepEqual(Object.keys(catalog).sort(), supported);
   }
   for (const id of supported) {

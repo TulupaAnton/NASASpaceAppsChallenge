@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { countries } from '../lib/countries';
-import { coordinates } from '../lib/format';
 import { loadMap } from '../lib/map-assets';
 import { createMapView } from '../lib/map-view';
-import { countrySiteOptions, countrySites, selection, selectionKey } from '../lib/sites';
+import { countrySites, selection, selectionKey } from '../lib/sites';
 import { Icon } from './Icon';
 
 const EarthOpening = dynamic(() => import('./EarthOpening'), { ssr: false });
@@ -295,13 +294,6 @@ export default function Experience({ onLocationSelected } = {}) {
     if (site) choosePoint(selection(site.point, site.region, site, countryId));
   }
 
-  function chooseNamedSite(event) {
-    const value = event.target.value;
-    if (value === '') return;
-    const site = countrySites[countryId][Number(value)];
-    if (site) choosePoint(selection(site.point, site.region, site, countryId));
-  }
-
   const mapReady = phase === 'map';
   const country = countries[countryId];
   const countryMatches = Object.values(countries).filter(option => option.name.toLowerCase().startsWith(countryQuery.trim().toLowerCase()));
@@ -317,6 +309,7 @@ export default function Experience({ onLocationSelected } = {}) {
               onClick={() => void switchCountry(option.id)}>{option.name}</button>)}
           </div>}
           <a className="sources-link" href={country.sources} aria-label="Data and sources" title="Data and sources"><span>Data &amp; sources</span> <Icon name="upRight" /></a>
+          {mapReady && <a className="credits" href={country.credits}>Map credits</a>}
           {mapReady && !selected && !motion.current?.matches && (
             <button className="icon-button replay" title="Replay intro" aria-label="Replay intro" disabled={!!switchTarget} onClick={replay}><Icon name="replay" /></button>
           )}
@@ -331,7 +324,7 @@ export default function Experience({ onLocationSelected } = {}) {
         />
         <canvas ref={outgoingMap} className="map-outgoing" aria-hidden="true" hidden />
         <div ref={atmosphere} className="map-switch-atmosphere" aria-hidden="true" />
-        <p className="sr-only" id="map-help">Choose a point with the pointer or the site menu. Use arrow keys to move the map cursor and Enter to select. Pinch the trackpad, scroll, or use plus and minus to zoom. Press Home to fit {country.name}.</p>
+        <p className="sr-only" id="map-help">Choose a point on the map. Use arrow keys to move the map cursor and Enter to select. Pinch the trackpad, scroll, or use plus and minus to zoom. Press Home to fit {country.name}.</p>
         <p className="sr-only" role="status">{switchTarget ? `Opening the map of ${countries[switchTarget].name}.` : ''}</p>
         {openingMounted && <EarthOpening key={openingRun} depart={departReady} reveal={phase === 'cloud-exit'}
           approachTarget={country.approachTarget}
@@ -389,37 +382,21 @@ export default function Experience({ onLocationSelected } = {}) {
           </div>
         )}
 
-        <div ref={focusArea} className="selection-area">
-          {selected && <p className="map-caption"><span className="signal-dot" /> {coordinates(selected.latitude, selected.longitude)}</p>}
-        </div>
+        <div ref={focusArea} className="selection-area" />
         <p className="map-notice" role="status">{notice}</p>
       </div>
 
       {selected && <Analysis site={selected} onChooseSite={chooseReference} shortlist={shortlist}
         onAdd={addSite} onRemove={removeSite} />}
-      <footer className="footer">
-        <a className="credits" href={country.credits}>Map credits</a>
-        {mapReady ? (
-          <label className="site-picker">
-            <Icon name="pin" />
-            <select aria-label="Choose a reference site" value={selected?.index ?? ''} onChange={chooseNamedSite} disabled={!!switchTarget}>
-              <option value="" disabled>Choose a reference site</option>
-              {countrySiteOptions[countryId].map(site => <option value={site.index} key={site.index}>{site.name}</option>)}
-            </select>
-            <Icon name="down" />
-          </label>
-        ) : (
-          <div className="flight-controls">
-            {(phase === 'loading' || phase === 'preparing') && <span role="status">Loading {country.name}…</span>}
-            {phase === 'error' && <button className="back-button" onClick={() => enterMap(true)}>Retry map <Icon name="right" /></button>}
-            {(phase === 'flight' || phase === 'cloud-exit') && (
-              <>
-                <button className="back-button" onClick={skipOpening}>Skip intro <Icon name="right" /></button>
-              </>
-            )}
-          </div>
-        )}
-      </footer>
+      {!mapReady && <footer className="footer">
+        <div className="flight-controls">
+          {(phase === 'loading' || phase === 'preparing') && <span role="status">Loading {country.name}…</span>}
+          {phase === 'error' && <button className="back-button" onClick={() => enterMap(true)}>Retry map <Icon name="right" /></button>}
+          {(phase === 'flight' || phase === 'cloud-exit') && (
+            <button className="back-button" onClick={skipOpening}>Skip intro <Icon name="right" /></button>
+          )}
+        </div>
+      </footer>}
     </main>
   );
 }

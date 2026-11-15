@@ -11,14 +11,12 @@ const experience = byId('experience');
 const video = byId('flight');
 const map = byId('map');
 const playButton = byId('center-play');
-const sitePicker = byId('site-picker');
 const apiBase = document.querySelector('meta[name="finland-point-api"]')?.content.trim();
 const sitingPanel = createSitingPanel(byId('point-panel'), {
   initialWind: params.get('wind') === 'merra2' ? 'merra2' : 'gwa',
   pointApi: apiBase ? createPointApi({ baseUrl: apiBase }) : undefined,
   onClose() {
     selected = null;
-    sitePicker.value = '';
     schedule();
   },
 });
@@ -417,7 +415,6 @@ function selectPoint(point, marker) {
   [longitude, latitude] = point;
   selected = { name: marker?.name ?? '', xy: marker?.xy ?? project(...point) };
   markerStarted = performance.now();
-  sitePicker.value = marker ? String(places.indexOf(marker)) : '';
   sitingPanel.select({ latitude, longitude, region, name: selected.name, siteId: marker?.siteId });
   schedule();
 }
@@ -427,20 +424,6 @@ function selectAt(x, y, tolerance = 9) {
   const point = marker?.point ?? locationAt(x, y);
   if (point) selectPoint(point, marker);
 }
-
-for (const place of [...places].sort((a, b) => a.name.localeCompare(b.name))) {
-  const option = document.createElement('option');
-  option.value = String(places.indexOf(place));
-  option.textContent = place.name;
-  sitePicker.append(option);
-}
-sitePicker.addEventListener('change', () => {
-  if (phase !== 'map' || !sitePicker.value) return;
-  const place = places[Number(sitePicker.value)];
-  finishHandoff();
-  fitMap();
-  selectPoint(place.point, place);
-});
 
 function relative(event) {
   const origin = map.getBoundingClientRect();

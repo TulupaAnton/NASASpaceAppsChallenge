@@ -71,6 +71,8 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
   isolation: isolate;
 }
 
+.experience[data-view="map"], .experience[data-view="analysis"] { --foot: 0px; }
+
 .topbar, .footer {
   position: absolute;
   inset-inline: 0;
@@ -89,24 +91,17 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
   background: linear-gradient(#000b, transparent);
 }
 
-.experience[data-view="map"] .footer {
-  background: linear-gradient(transparent, #000c);
-}
-
-.experience[data-view="map"] .topbar,
-.experience[data-view="map"] .footer {
+.experience[data-view="map"] .topbar {
   animation: map-chrome-in .75s ease both;
 }
 
 @keyframes map-chrome-in { from { opacity: 0; } to { opacity: 1; } }
 
-.experience[data-view="analysis"] .topbar,
-.experience[data-view="analysis"] .footer {
+.experience[data-view="analysis"] .topbar {
   background: #000;
 }
 
-.experience[data-view="analysis"] .topbar::after,
-.experience[data-view="analysis"] .footer::before {
+.experience[data-view="analysis"] .topbar::after {
   content: "";
   position: absolute;
   inset-inline: var(--shell);
@@ -116,9 +111,8 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
 }
 
 .topbar::after { bottom: 0; }
-.footer::before { top: 0; }
 
-.brand, .toplinks, .toplinks a, .back-button, .flight-controls, .site-picker, .text-button {
+.brand, .toplinks, .toplinks a, .back-button, .flight-controls, .text-button {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -151,14 +145,14 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
 .map-country-picker button:hover { color: #f1fff8; }
 .map-country-picker button[aria-pressed="true"] { background: #26453a; color: #e3f8ee; }
 .map-country-picker button[aria-disabled="true"] { cursor: wait; }
-.back-button, .site-picker, .icon-button {
+.back-button, .icon-button {
   border: 1px solid #314540;
   border-radius: 7px;
   background: #101918e0;
   min-height: 38px;
 }
 .back-button { padding-inline: 12px; font-size: 12px; white-space: nowrap; }
-.back-button:hover, .icon-button:hover, .site-picker:hover, .zoom button:hover { background: #192924; border-color: #557266; }
+.back-button:hover, .icon-button:hover, .zoom button:hover { background: #192924; border-color: #557266; }
 .icon-button { display: grid; place-items: center; width: 38px; }
 .icon-button svg { width: 17px; height: 17px; }
 .flight-controls { gap: 12px; }
@@ -378,28 +372,13 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
 .zoom button + button { border-top: 1px solid #314540; }
 .zoom button:focus-visible { outline-offset: -3px; }
 
-.site-picker { position: relative; gap: 0; width: 221px; }
-.site-picker select {
-  width: 100%;
-  appearance: none;
-  min-height: 38px;
-  padding: 0 31px 0 34px;
-  font-size: 12px;
-  border: 0;
-  border-radius: inherit;
-  background: transparent;
-}
-.site-picker option { background: #101918; }
-.site-picker svg { position: absolute; pointer-events: none; left: 10px; width: 16px; height: 16px; color: var(--mint); }
-.site-picker svg:last-child { right: 10px; left: auto; color: var(--muted); }
-
 .selection-area {
   position: absolute;
   inset: var(--head) calc(var(--analysis-width) + var(--analysis-gap) + var(--shell)) var(--foot) 0;
   pointer-events: none;
 }
 
-.map-caption, .map-notice {
+.map-notice {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
@@ -414,8 +393,6 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
   pointer-events: none;
 }
 
-.map-caption { bottom: 8px; animation: show .4s .48s both; }
-.map-caption .signal-dot { background: var(--amber); }
 .map-notice:empty { display: none; }
 .map-notice {
   bottom: calc(var(--foot) + 27px);
@@ -433,7 +410,7 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
 .analysis-panel {
   position: absolute;
   z-index: 2;
-  inset: calc(var(--head) + 16px) var(--shell) calc(var(--analysis-footer-height, var(--foot)) + 12px) auto;
+  inset: calc(var(--head) + 16px) var(--shell) calc(var(--foot) + 12px) auto;
   width: var(--analysis-width);
   overflow-x: hidden;
   overflow-y: auto;
@@ -521,7 +498,6 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
 @media (max-width: 939px) {
   .experience[data-view="analysis"] { padding-top: var(--head); }
   .experience[data-view="analysis"] .scene { height: min(56svh, 515px); min-height: 300px; }
-  .experience[data-view="analysis"] .footer { position: relative; min-height: var(--foot); margin-top: 16px; }
   .selection-area { inset: 0; }
   .experience[data-view="analysis"] .zoom { right: var(--shell); bottom: 14px; }
   .experience[data-view="analysis"] .map-notice { bottom: 22px; }
@@ -551,7 +527,6 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
   .toplinks a svg { display: none; }
   .back-button { padding-inline: 8px; gap: 4px; }
   .zoom button { width: 36px; height: 35px; }
-  .site-picker { width: min(221px, 70%); }
   .toplinks .sources-link span { display: none; }
   .toplinks .sources-link svg { display: block; }
   .experience[data-view="analysis"] .toplinks > a { display: none; }
@@ -686,14 +661,12 @@ svg { display: block; width: 20px; height: 20px; flex: none; }
 /* Approved city-lights opening, replacing the prerecorded flight. */
 .earth-opening { object-fit: initial; touch-action: none; background: transparent; }
 .earth-opening canvas { display: block; width: 100%; height: 100%; }
-.experience[data-view="flight"] .topbar,
-.experience[data-view="flight"] .footer > .credits { visibility: hidden; }
+.experience[data-view="flight"] .topbar { visibility: hidden; }
 .experience[data-view="flight"] .flight-controls { animation: opening-controls-in .267s .533s both; }
 @keyframes opening-controls-in { from { opacity: 0; visibility: hidden; } to { opacity: 1; visibility: visible; } }
 @media (max-width: 939px) { .earth-opening { width: 100%; left: 0; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   .earth-opening,
   .experience[data-view="flight"] .flight-controls,
-  .experience[data-view="map"] .topbar,
-  .experience[data-view="map"] .footer { transition: none; animation: none; }
+  .experience[data-view="map"] .topbar { transition: none; animation: none; }
 }
