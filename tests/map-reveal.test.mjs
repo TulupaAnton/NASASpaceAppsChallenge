@@ -31,7 +31,7 @@ test('full-screen reveal adds black edges continuously as the photo retracts', (
   const context={IMAGE_WIDTH,IMAGE_HEIGHT,project,unproject(){},sites:[],comparisonColors:[],selection(){},selectionKey(){},destination(){},
    window:{devicePixelRatio:1},performance:{now:()=>now},ResizeObserver:class {observe(){} disconnect(){}},
    requestAnimationFrame:callback=>{queue.set(++id,callback);return id;},cancelAnimationFrame:key=>queue.delete(key)};
-  const source=fs.readFileSync(new URL('app/lib/map-view.js', root),'utf8').replace(/^import .*;\n/gm,'').replace('export function createMapView','function createMapView');
+  const source=fs.readFileSync(new URL('app/lib/map-view.js', root),'utf8').replace(/^import .*;\r?\n/gm,'').replace('export function createMapView','function createMapView');
   vm.createContext(context);vm.runInContext(source+'\nglobalThis.createMapView=createMapView;',context);
   const layer={bitmap:{},x:0,y:0,width:1280,height:720};
   const assets={bounds,image:{},borders:layer,zoomBorders:layer};

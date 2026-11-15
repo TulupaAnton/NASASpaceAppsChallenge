@@ -51,7 +51,7 @@ export function normalizeAnalysis(report, site) {
       total: report.partial ? null : numeric(row.scores?.overall),
       rank,
       ofTotal: rank === null ? null : report.count,
-      factors: factorDefinitions.map(({ key, label }) => {
+      factors: factorDefinitions.filter(({ key }) => meta?.country !== 'ca' || key !== 'water').map(({ key, label }) => {
         const score = numeric(row.scores?.[key]);
         const weight = numeric(weights?.[key]);
         const contribution = numeric(row.score_contributions?.[key]) ??
@@ -82,6 +82,7 @@ export function comparableScores(a, b) {
   const signature = ({ ranking, meta }) => {
     const weights = ranking.insight?.effective_weights ?? meta?.weights ?? {};
     return JSON.stringify([
+      meta?.country ?? 'fi',
       meta?.scoring_mode,
       meta?.historical_period ?? null,
       meta?.scenario_period ?? null,

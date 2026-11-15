@@ -1,9 +1,11 @@
 import { loadFinlandGeometry } from '../../public/legacy/finland-geometry';
-import { collectRegions, findRegion, IMAGE_HEIGHT, IMAGE_WIDTH, project } from '../../public/legacy/projection';
+import { collectRegions, findRegion, IMAGE_HEIGHT, IMAGE_WIDTH } from '../../public/legacy/projection';
+import { countries } from './countries';
+import { countrySites } from './sites';
 
-let pending;
+const pending = new Map();
 
-function addRing(path, ring, bounds) {
+function addRing(path, ring, project, bounds) {
   for (const [index, point] of ring.entries()) {
     const [x, y] = project(...point);
     if (index) path.lineTo(x, y);
@@ -55,14 +57,14 @@ function rasterize([west, north, east, south], precision, draw) {
   return { bitmap, x, y, width, height };
 }
 
-function prepareMap(image, { rings, regionData }) {
+function prepareMap(image, { rings, regionData }, { id, project, unproject }) {
   const country = new Path2D();
   const outline = new Path2D();
   const islands = new Path2D();
   const bounds = [Infinity, Infinity, -Infinity, -Infinity];
   for (const ring of rings) {
     const ringPath = new Path2D();
-    addRing(ringPath, ring, bounds);
+    addRing(ringPath, ring, project, bounds);
     const [startX, startY] = ring[0];
     const major = ring.some(([x, y]) => Math.abs(x - startX) > .16 || Math.abs(y - startY) > .16);
     country.addPath(ringPath);
@@ -74,7 +76,7 @@ function prepareMap(image, { rings, regionData }) {
   for (const region of regionData) {
     const path = new Path2D();
     for (const polygon of region.polygons) {
-      for (const ring of polygon) addRing(path, ring);
+      for (const ring of polygon) addRing(path, ring, project);
     }
     allRegions.addPath(path);
     paths.set(region.name, path);
@@ -124,19 +126,31 @@ function prepareMap(image, { rings, regionData }) {
     return highlightLayer;
   }
 
-  return { image, bounds, cutout, borders, zoomBorders, highlight, regionAt: regionLookup(regionData) };
+  return {
+    country: id, sites: countrySites[id], unproject,
+    image, bounds, cutout, borders, zoomBorders, highlight, regionAt: regionLookup(regionData),
+  };
 }
 
-export function loadMap() {
-  if (!pending) {
+async function loadCanadaGeometry() {
+  const response = await fetch('/canada/geometry.json');
+  if (!response.ok) throw new Error('Canada boundaries could not be loaded.');
+  return response.json();
+}
+
+export function loadMap(country) {
+  if (!pending.has(country)) {
+    const config = countries[country];
     const image = new Image();
-    image.src = '/legacy/assets/finland-satellite.webp';
-    pending = Promise.all([image.decode(), loadFinlandGeometry('/legacy/assets/finland-geometry.bin')])
-      .then(([, geometry]) => prepareMap(image, geometry))
+    image.src = config.satellite;
+    const geometry = country === 'ca' ? loadCanadaGeometry() : loadFinlandGeometry('/legacy/assets/finland-geometry.bin');
+    const task = Promise.all([image.decode(), geometry])
+      .then(([, data]) => prepareMap(image, data, config))
       .catch(error => {
-        pending = undefined;
+        pending.delete(country);
         throw error;
       });
+    pending.set(country, task);
   }
-  return pending;
+  return pending.get(country);
 }

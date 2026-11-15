@@ -1,5 +1,5 @@
-import { IMAGE_HEIGHT, IMAGE_WIDTH, unproject } from '../../public/legacy/projection';
-import { comparisonColors, selection, sites } from './sites';
+import { IMAGE_HEIGHT, IMAGE_WIDTH } from '../../public/legacy/projection';
+import { comparisonColors, selection } from './sites';
 
 const amber = '#ffc477';
 const clamp = (x, min, max) => Math.min(max, Math.max(min, x));
@@ -8,6 +8,7 @@ const smooth = t => t * t * (3 - 2 * t);
 
 export function createMapView(canvas, focusArea, assets, onPick, onMiss, reducedMotion) {
   const ctx = canvas.getContext('2d', { alpha: false });
+  const { country, sites = [], unproject } = assets;
   const [west, north, east, south] = assets.bounds;
   const centerX = (west + east) / 2;
   const centerY = (north + south) / 2;
@@ -357,7 +358,7 @@ export function createMapView(canvas, focusArea, assets, onPick, onMiss, reduced
 
   function pick(position, tolerance = 8) {
     const result = locate(position, tolerance);
-    if (result) onPick(selection(result.point, result.region, result.site));
+    if (result) onPick(selection(result.point, result.region, result.site, country));
     else onMiss();
   }
 

@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { countries } from '../lib/countries';
 import { coordinates } from '../lib/format';
 import { loadMap } from '../lib/map-assets';
 import { createMapView } from '../lib/map-view';
-import { selection, selectionKey, siteOptions, sites } from '../lib/sites';
+import { countrySiteOptions, countrySites, selection, selectionKey } from '../lib/sites';
 import { Icon } from './Icon';
 
 const EarthOpening = dynamic(() => import('./EarthOpening'), { ssr: false });
@@ -17,6 +18,8 @@ const Analysis = dynamic(() => import('./Analysis'), {
 
 export default function Experience() {
   const [phase, setPhase] = useState('reveal');
+  const [countryId, setCountryId] = useState('fi');
+  const [switchTarget, setSwitchTarget] = useState(null);
   const [countryChosen, setCountryChosen] = useState(false);
   const [countryQuery, setCountryQuery] = useState('');
   const [countrySearchOpen, setCountrySearchOpen] = useState(false);
@@ -27,9 +30,14 @@ export default function Experience() {
   const [mapPrepared, setMapPrepared] = useState(false);
   const [notice, setNotice] = useState('');
   const canvas = useRef(null);
+  const outgoingMap = useRef(null);
+  const atmosphere = useRef(null);
   const experience = useRef(null);
   const focusArea = useRef(null);
   const view = useRef(null);
+  const activeCountry = useRef('fi');
+  const switching = useRef(false);
+  const mapAnimations = useRef([]);
   const phaseRef = useRef('reveal');
   const openingFailed = useRef(false);
   const run = useRef(0);
@@ -39,28 +47,35 @@ export default function Experience() {
   const preparedMap = useRef(null);
 
   const choosePoint = useCallback(site => {
+    if (switching.current || site.country !== activeCountry.current) return;
     setNotice('');
     setSelected(site);
     view.current?.show(site);
   }, []);
 
-  const miss = useCallback(() => {
+  const showNotice = useCallback(message => {
     clearTimeout(noteTimer.current);
-    setNotice('Select a point inside Finland’s highlighted boundary.');
+    setNotice(message);
     noteTimer.current = setTimeout(() => setNotice(''), 3600);
   }, []);
+
+  const replaceMap = useCallback(assets => {
+    view.current?.destroy();
+    const miss = () => showNotice(`Select a point inside the highlighted boundary of ${countries[assets.country].name}.`);
+    view.current = createMapView(canvas.current, focusArea.current, assets, choosePoint, miss, () => motion.current?.matches);
+    return view.current;
+  }, [choosePoint, showNotice]);
 
   const prepareMap = useCallback(() => {
     if (preparedMap.current) return preparedMap.current;
     const current = run.current;
     preparedMap.current = (async () => {
       try {
-        const assets = await loadMap();
+        const assets = await loadMap(activeCountry.current);
         if (current !== run.current || !canvas.current) return false;
-        view.current?.destroy();
-        view.current = createMapView(canvas.current, focusArea.current, assets, choosePoint, miss, () => motion.current?.matches);
-        view.current.prepareReveal();
-        const painted = await view.current.whenPainted();
+        const nextView = replaceMap(assets);
+        nextView.prepareReveal();
+        const painted = await nextView.whenPainted();
         return painted && current === run.current;
       } catch (error) {
         if (current === run.current) preparedMap.current = null;
@@ -68,7 +83,7 @@ export default function Experience() {
       }
     })();
     return preparedMap.current;
-  }, [choosePoint, miss]);
+  }, [replaceMap]);
 
   const enterMap = useCallback(async (skip = false, cloudHandoff = false) => {
     if (skip) skipRequested.current = true;
@@ -104,6 +119,8 @@ export default function Experience() {
       run.current++;
       phaseRef.current = 'reveal';
       clearTimeout(noteTimer.current);
+      mapAnimations.current.forEach(animation => animation.cancel());
+      switching.current = false;
       view.current?.destroy();
       view.current = null;
       preparedMap.current = null;
@@ -124,8 +141,8 @@ export default function Experience() {
   }
 
   const preload = useCallback(() => {
-    void prepareMap().catch(() => {});
-  }, [prepareMap]);
+    void loadMap('fi').catch(() => {});
+  }, []);
   const skipOpening = useCallback(() => { void enterMap(true); }, [enterMap]);
   const prepareCloudMap = useCallback(() => { void enterMap(false, true); }, [enterMap]);
   const finishClouds = useCallback(() => {
@@ -151,10 +168,75 @@ export default function Experience() {
     else { layoutOpening(1); showCountryChoice(); }
   }, [enterMap, showCountryChoice, layoutOpening]);
 
-  function chooseCountry() {
+  function chooseCountry(id) {
+    if (phaseRef.current !== 'country') return;
+    activeCountry.current = id;
+    setCountryId(id);
     phaseRef.current = 'flight';
     setCountryChosen(true);
-    if (openingFailed.current) void enterMap(true);
+    if (openingFailed.current || motion.current?.matches) void enterMap(true);
+    else void loadMap(id).catch(() => {});
+  }
+
+  async function switchCountry(id) {
+    if (id === activeCountry.current || switching.current || phaseRef.current !== 'map') return;
+    const current = run.current;
+    switching.current = true;
+    setSwitchTarget(id);
+    setNotice('');
+    try {
+      const assets = await loadMap(id);
+      if (current !== run.current) return;
+      const map = canvas.current;
+      const snapshot = outgoingMap.current;
+      const animate = !motion.current?.matches && typeof map.animate === 'function';
+      if (animate) {
+        snapshot.width = map.width;
+        snapshot.height = map.height;
+        snapshot.getContext('2d').drawImage(map, 0, 0);
+        snapshot.hidden = false;
+      }
+
+      activeCountry.current = id;
+      setCountryId(id);
+      setSelected(null);
+      setShortlist([]);
+      window.scrollTo(0, 0);
+      const nextView = replaceMap(assets);
+      nextView.enter(true);
+      await nextView.whenPainted();
+      if (current !== run.current || !animate) return;
+
+      const direction = id === 'ca' ? 1 : -1;
+      const options = { duration: 950, easing: 'cubic-bezier(.42, 0, .23, 1)', fill: 'both' };
+      mapAnimations.current = [
+        map.animate([
+          { transform: `translateX(${direction * -5}%) scale(1.12)` },
+          { transform: 'translateX(0) scale(1)' },
+        ], options),
+        snapshot.animate([
+          { transform: 'translateX(0) scale(1)', opacity: 1 },
+          { transform: `translateX(${direction * 5}%) scale(.96)`, opacity: 0 },
+        ], options),
+        atmosphere.current.animate([
+          { opacity: 0, transform: `translateX(${direction * -18}%)` },
+          { opacity: .72, offset: .44 },
+          { opacity: 0, transform: `translateX(${direction * 18}%)` },
+        ], options),
+      ];
+      await Promise.allSettled(mapAnimations.current.map(animation => animation.finished));
+    } catch {
+      if (current === run.current) showNotice(`${countries[id].name} could not be loaded. Try again.`);
+    } finally {
+      if (current === run.current) {
+        mapAnimations.current.forEach(animation => animation.cancel());
+        mapAnimations.current = [];
+        outgoingMap.current.hidden = true;
+        outgoingMap.current.width = 1;
+        switching.current = false;
+        setSwitchTarget(null);
+      }
+    }
   }
 
   function replay() {
@@ -166,6 +248,7 @@ export default function Experience() {
     view.current = null;
     preparedMap.current = null;
     setSelected(null);
+    setShortlist([]);
     setNotice('');
     setPhase('reveal');
     setCountryChosen(false);
@@ -186,28 +269,34 @@ export default function Experience() {
   }
 
   function chooseReference(referenceId) {
-    const site = sites.find(ref => ref.siteId === referenceId);
-    if (site) choosePoint(selection(site.point, site.region, site));
+    const site = countrySites[countryId].find(ref => ref.siteId === referenceId);
+    if (site) choosePoint(selection(site.point, site.region, site, countryId));
   }
 
   function chooseNamedSite(event) {
     const value = event.target.value;
     if (value === '') return;
-    const site = sites[Number(value)];
-    choosePoint(selection(site.point, site.region, site));
+    const site = countrySites[countryId][Number(value)];
+    if (site) choosePoint(selection(site.point, site.region, site, countryId));
   }
 
   const mapReady = phase === 'map';
-  const countryMatches = 'finland'.startsWith(countryQuery.trim().toLowerCase());
+  const country = countries[countryId];
+  const countryMatches = Object.values(countries).filter(option => option.name.toLowerCase().startsWith(countryQuery.trim().toLowerCase()));
   return (
-    <main ref={experience} className="experience" data-view={selected ? 'analysis' : mapReady ? 'map' : 'flight'}
+    <main ref={experience} className="experience" data-view={selected ? 'analysis' : mapReady ? 'map' : 'flight'} data-switching={!!switchTarget}
       onKeyDown={event => { if (event.key === 'Escape' && selected) backToMap(); }}>
       <header className="topbar">
         <div className="brand"><Icon name="globe" /><span>DataX</span></div>
         <div className="toplinks">
-          <a href="/legacy/data-package.html">Data &amp; sources <Icon name="upRight" /></a>
+          {mapReady && <div className="map-country-picker" role="group" aria-label="Map country">
+            {Object.values(countries).map(option => <button key={option.id} type="button"
+              aria-pressed={countryId === option.id} aria-disabled={!!switchTarget || undefined}
+              onClick={() => void switchCountry(option.id)}>{option.name}</button>)}
+          </div>}
+          <a className="sources-link" href={country.sources} aria-label="Data and sources" title="Data and sources"><span>Data &amp; sources</span> <Icon name="upRight" /></a>
           {mapReady && !selected && !motion.current?.matches && (
-            <button className="icon-button replay" title="Replay intro" aria-label="Replay intro" onClick={replay}><Icon name="replay" /></button>
+            <button className="icon-button replay" title="Replay intro" aria-label="Replay intro" disabled={!!switchTarget} onClick={replay}><Icon name="replay" /></button>
           )}
           {selected && <button className="back-button" onClick={backToMap}><Icon name="left" /> Back to map</button>}
         </div>
@@ -215,11 +304,15 @@ export default function Experience() {
 
       <div className="scene">
         <canvas
-          ref={canvas} className="map" tabIndex={mapReady ? 0 : -1} role="region" aria-label="Interactive satellite map of Finland"
+          ref={canvas} className="map" tabIndex={mapReady && !switchTarget ? 0 : -1} role="region" aria-label={`Interactive satellite map of ${country.name}`}
           aria-describedby="map-help" aria-hidden={!mapPrepared}
         />
-        <p className="sr-only" id="map-help">Choose a point with the pointer or the site menu. Use arrow keys to move the map cursor and Enter to select. Pinch the trackpad, scroll, or use plus and minus to zoom. Press Home to fit Finland.</p>
+        <canvas ref={outgoingMap} className="map-outgoing" aria-hidden="true" hidden />
+        <div ref={atmosphere} className="map-switch-atmosphere" aria-hidden="true" />
+        <p className="sr-only" id="map-help">Choose a point with the pointer or the site menu. Use arrow keys to move the map cursor and Enter to select. Pinch the trackpad, scroll, or use plus and minus to zoom. Press Home to fit {country.name}.</p>
+        <p className="sr-only" role="status">{switchTarget ? `Opening the map of ${countries[switchTarget].name}.` : ''}</p>
         {openingMounted && <EarthOpening key={openingRun} depart={countryChosen} reveal={phase === 'cloud-exit'}
+          approachTarget={country.approachTarget}
           onDepart={departOpening} onChooseReady={showCountryChoice} onLayout={layoutOpening}
           onComplete={prepareCloudMap} onApproachExit={finishClouds}
           onReady={preload} onError={failOpening} />}
@@ -229,11 +322,11 @@ export default function Experience() {
           <div className="country-brand">DataX</div>
           <section className="country-choice" aria-labelledby="country-heading">
             <h1 id="country-heading">Choose a<br />country</h1>
-            <form className="country-search" data-expanded={countrySearchOpen && !countryChosen} onBlur={event => {
+            <form className="country-search" data-expanded={countrySearchOpen && !countryChosen} data-results={countryMatches.length} onBlur={event => {
               if (!event.currentTarget.contains(event.relatedTarget)) setCountrySearchOpen(false);
             }} onSubmit={event => {
               event.preventDefault();
-              if (countrySearchOpen && countryMatches && !countryChosen) chooseCountry();
+              if (countrySearchOpen && countryMatches.length === 1) chooseCountry(countryMatches[0].id);
             }}>
               <label className="sr-only" htmlFor="country-search">Search country</label>
               <input id="country-search" type="search" placeholder="Type..." autoComplete="off"
@@ -244,10 +337,10 @@ export default function Experience() {
                 aria-expanded={countrySearchOpen && !countryChosen}
                 aria-controls={countrySearchOpen && !countryChosen ? 'country-results' : undefined} />
               {countrySearchOpen && !countryChosen && <div id="country-results" className="country-results">
-                {countryMatches ? (
-                  <button className="country-option" type="submit" disabled={countryChosen}>
-                    Finland
-                  </button>
+                {countryMatches.length ? (
+                  countryMatches.map(option => <button className="country-option" key={option.id} type="button" onClick={() => chooseCountry(option.id)}>
+                    {option.name}
+                  </button>)
                 ) : <p className="country-empty" role="status">No countries found.</p>}
               </div>}
             </form>
@@ -256,17 +349,17 @@ export default function Experience() {
         )}
 
         {mapReady && !selected && (
-          <div className="map-heading">
-            <h1>Finland</h1>
+          <div className="map-heading" key={countryId}>
+            <h1>{country.name}</h1>
             <p className="map-instruction">Select a point to see how it compares as a data center site.</p>
           </div>
         )}
 
         {mapReady && (
-          <div className="zoom" aria-label="Map controls">
+          <div className="zoom" aria-label="Map controls" inert={!!switchTarget}>
             <button aria-label="Zoom in" title="Zoom in" onClick={() => view.current?.zoom(1.4)}><Icon name="plus" /></button>
             <button aria-label="Zoom out" title="Zoom out" onClick={() => view.current?.zoom(1 / 1.4)}><Icon name="minus" /></button>
-            <button aria-label="Fit Finland" title="Fit Finland" onClick={() => view.current?.zoom(1)}><Icon name="focus" /></button>
+            <button aria-label={`Fit ${country.name}`} title={`Fit ${country.name}`} onClick={() => view.current?.zoom(1)}><Icon name="focus" /></button>
           </div>
         )}
 
@@ -279,19 +372,19 @@ export default function Experience() {
       {selected && <Analysis site={selected} onChooseSite={chooseReference} shortlist={shortlist}
         onAdd={addSite} onRemove={removeSite} />}
       <footer className="footer">
-        <a className="credits" href="/legacy/credits.html">Map credits</a>
+        <a className="credits" href={country.credits}>Map credits</a>
         {mapReady ? (
           <label className="site-picker">
             <Icon name="pin" />
-            <select aria-label="Choose a reference site" value={selected?.index ?? ''} onChange={chooseNamedSite}>
+            <select aria-label="Choose a reference site" value={selected?.index ?? ''} onChange={chooseNamedSite} disabled={!!switchTarget}>
               <option value="" disabled>Choose a reference site</option>
-              {siteOptions.map(site => <option value={site.index} key={site.index}>{site.name}</option>)}
+              {countrySiteOptions[countryId].map(site => <option value={site.index} key={site.index}>{site.name}</option>)}
             </select>
             <Icon name="down" />
           </label>
         ) : (
           <div className="flight-controls">
-            {phase === 'loading' && <span role="status">Loading Finland…</span>}
+            {phase === 'loading' && <span role="status">Loading {country.name}…</span>}
             {phase === 'error' && <button className="back-button" onClick={() => enterMap(true)}>Retry map <Icon name="right" /></button>}
             {(phase === 'flight' || phase === 'cloud-exit') && (
               <>

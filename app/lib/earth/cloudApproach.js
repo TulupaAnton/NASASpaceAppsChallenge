@@ -7,10 +7,10 @@ export const CLOUD_APPROACH_CLEARANCE = .0006;
 export const CLOUD_DEPARTURE_DURATION = 4.5 / 1.5;
 export const CLOUD_DEPARTURE_RADIUS = .9948;
 
-export function createCloudApproach({ camera, clouds, reducedMotion, onProgress, onComplete }) {
+export function createCloudApproach({ camera, clouds, targetLocation = CLOUD_APPROACH_TARGET, reducedMotion, onProgress, onComplete }) {
   clouds.updateWorldMatrix(true, false);
-  const lon = THREE.MathUtils.degToRad(CLOUD_APPROACH_TARGET.longitude);
-  const lat = THREE.MathUtils.degToRad(CLOUD_APPROACH_TARGET.latitude);
+  const lon = THREE.MathUtils.degToRad(targetLocation.longitude);
+  const lat = THREE.MathUtils.degToRad(targetLocation.latitude);
   const target = new THREE.Vector3(Math.cos(lat) * Math.cos(lon), Math.sin(lat), -Math.cos(lat) * Math.sin(lon))
     .multiplyScalar(1 + CLOUD_APPROACH_CLEARANCE).applyMatrix4(clouds.matrixWorld);
   const cloudRadius = target.length() / (1 + CLOUD_APPROACH_CLEARANCE);
