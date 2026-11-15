@@ -1,0 +1,38 @@
+{
+  "purpose": "Illustrative 3D Earth opening scene, not a live-weather map or temperature-analysis result.",
+  "credit": "NASA Earth Observatory / NASA Goddard Space Flight Center; Reto St\u00f6ckli and Robert Simmon.",
+  "source_pages": [
+    "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/",
+    "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/",
+    "https://science.nasa.gov/earth/earth-observatory/the-blue-marble-true-color-global-imagery-at-1km-resolution/"
+  ],
+  "context": "Day surface: July 2004 Blue Marble Next Generation. Clouds and city-light composite: original Blue Marble collection; illustrative layers are not synchronized to the analysis period or the current date.",
+  "changes": "Original downloaded images are unmodified. Lighting, cloud transparency and compositing are applied in the 3D scene.",
+  "code_assistance": "Scene implementation prepared with AI assistance from OpenAI Codex. Image textures are NASA source imagery, not AI-generated.",
+  "files": [
+    {
+      "file": "earth-day.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-base/july/world.200407.3x5400x2700.jpg",
+      "sha256": "f55226d46d27e05511f2118dc6aa24f5dbf9b6b2cddc87cc6e0e7dd067c00b11",
+      "bytes": 1617810,
+      "width": 5400,
+      "height": 2700
+    },
+    {
+      "file": "earth-clouds.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/content-feature/bluemarble/images/cloud_combined_2048.jpg",
+      "sha256": "daddaad84d7a33bbbc86cdda3f591099f57cee8607b7bcf3b67eb7e4f7a1c793",
+      "bytes": 829367,
+      "width": 2048,
+      "height": 1024
+    },
+    {
+      "file": "earth-night.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/content-feature/bluemarble/images/land_ocean_ice_lights_2048.jpg",
+      "sha256": "6d3a23dc7ce2ab98bfd91222389bbeef07c56a5980d934365116196daeb22e07",
+      "bytes": 151783,
+      "width": 2048,
+      "height": 1024
+    }
+  ]
+}
